@@ -41,3 +41,10 @@
 
 /* 언어 선택은 숨김 (기본 한국어) */
 #kc-locale { display: none; }
+
+/* 비밀번호 보기 버튼을 입력칸과 한 덩어리로 */
+.pf-c-input-group .pf-c-form-control { border-radius: 8px 0 0 8px; }
+.pf-c-input-group .pf-c-button.pf-m-control {
+  height: 42px; border: 1px solid var(--pg-line); border-left: 0; border-radius: 0 8px 8px 0; background: #fff;
+}
+.pf-c-input-group .pf-c-button.pf-m-control::after { border: 0; }
