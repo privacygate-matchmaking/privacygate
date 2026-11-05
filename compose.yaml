@@ -40,6 +40,7 @@ services:
       EXTERNAL_BASE_URL: ${EXTERNAL_BASE_URL:-https://localhost:8090}
     volumes:
       - ./infra/keycloak/realm-matchmaking.json:/opt/keycloak/data/import/realm-matchmaking.json:ro
+      - ./infra/keycloak/themes/privacygate-staff:/opt/keycloak/themes/privacygate-staff:ro   # 직원 로그인 테마
       - keycloak-data:/opt/keycloak/data
       - ./infra/secrets/tls:/opt/keycloak/conf/tls:ro
     ports: ["127.0.0.1:8081:8443"]          # 브라우저는 HTTPS 로만
@@ -51,16 +52,16 @@ services:
       retries: 30
       start_period: 30s
 
-  # 직원 OTP 강제 여부 적용 (.env REQUIRE_STAFF_OTP, 기본 true). 실행 후 종료되는 일회성 작업
+  # realm 설정 적용: 한국어·직원 로그인 테마, 직원 OTP 강제 여부(.env REQUIRE_STAFF_OTP, 기본 true). 실행 후 종료
   keycloak-setup:
     image: quay.io/keycloak/keycloak:26.0.7
-    entrypoint: ["/bin/bash", "/opt/setup/staff-otp.sh"]
+    entrypoint: ["/bin/bash", "/opt/setup/realm-setup.sh"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
       REQUIRE_STAFF_OTP: ${REQUIRE_STAFF_OTP:-true}
     volumes:
-      - ./infra/keycloak/staff-otp.sh:/opt/setup/staff-otp.sh:ro
+      - ./infra/keycloak/realm-setup.sh:/opt/setup/realm-setup.sh:ro
     networks: [auth-internal-net]
     depends_on:
       keycloak: { condition: service_healthy }

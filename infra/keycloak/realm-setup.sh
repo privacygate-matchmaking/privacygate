@@ -1,5 +1,7 @@
 #!/bin/bash
-# 직원 OTP(TOTP) 강제 여부를 .env 의 REQUIRE_STAFF_OTP 에 맞춘다. (keycloak-setup 서비스가 시작할 때 한 번 실행)
+# keycloak-setup 서비스가 시작할 때 한 번 실행한다. (realm 파일은 처음 한 번만 불러오므로 이미 만든 realm 에도 적용)
+#  1) 한국어 기본, 직원용 로그인 테마(internal-web 만)
+#  2) 직원 OTP(TOTP) 강제 여부를 .env 의 REQUIRE_STAFF_OTP 에 맞춘다
 #   true  (기본, 시연·평가): OTP 미등록 직원에게 첫 로그인 시 OTP 등록 강제
 #   false (개발 중에만): 직원의 OTP 등록 요구와 등록된 OTP 를 지워 ID·비밀번호만으로 로그인
 set -euo pipefail
@@ -10,6 +12,13 @@ STAFF="counselor_a data_admin approver"
 $KC config credentials --server http://keycloak:8080 --realm master \
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null
 
+# 1) 한국어 기본 + internal-web 직원용 로그인 테마
+$KC update "realms/$REALM" -s internationalizationEnabled=true -s 'supportedLocales=["ko","en"]' -s defaultLocale=ko
+cid=$($KC get clients -r "$REALM" -q clientId=internal-web --fields id --format csv --noquotes)
+$KC update "clients/$cid" -r "$REALM" -s 'attributes."login_theme"=privacygate-staff'
+echo "한국어 기본, internal-web 로그인 테마: privacygate-staff"
+
+# 2) 직원 OTP
 for u in $STAFF; do
   id=$($KC get users -r "$REALM" -q username="$u" -q exact=true --fields id --format csv --noquotes)
   [ -n "$id" ] || { echo "사용자 없음: $u"; continue; }

@@ -1,0 +1,43 @@
+/* PrivacyGate 직원 로그인 — 내부 화면(internal-web) 시안과 같은 색·모양 */
+:root { --pg-bg:#f5f7fb; --pg-ink:#172033; --pg-muted:#718096; --pg-line:#e6eaf1; --pg-blue:#315efb; --pg-red:#d94b5b; }
+
+.login-pf body, body.login-pf { background: var(--pg-bg) none !important; }
+.login-pf-page { padding-top: 8vh; }
+.login-pf, .login-pf body, .login-pf-page { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif; }
+
+/* 상단 제목 (PrivacyGate 내부 업무) */
+#kc-header { margin-bottom: 18px; }
+#kc-header-wrapper {
+  color: var(--pg-ink); font-size: 26px; font-weight: 800; letter-spacing: 0;
+  text-transform: none; line-height: 1.3; padding: 0 10px; white-space: normal;
+}
+
+/* 카드 */
+.login-pf-page .card-pf {
+  max-width: 440px; margin: 0 auto; padding: 32px 36px;
+  background: #fff; border: 1px solid var(--pg-line); border-top: 1px solid var(--pg-line);
+  border-radius: 14px; box-shadow: 0 3px 12px rgba(26,44,74,.06);
+}
+#kc-page-title { color: var(--pg-ink); font-size: 24px; font-weight: 700; text-align: left; margin-bottom: 4px; }
+.login-pf-page .login-pf-header { margin-bottom: 20px; }
+
+/* 입력칸 */
+.login-pf-page label, .pf-c-form__label, .control-label { color: #59667c; font-size: 13px; font-weight: 650; }
+.pf-c-form-control, .form-control, .login-pf-page input[type=text], .login-pf-page input[type=password] {
+  border: 1px solid var(--pg-line); border-radius: 8px; height: 42px; box-shadow: none; color: var(--pg-ink);
+}
+.pf-c-form-control:focus, .form-control:focus { border-color: var(--pg-blue); box-shadow: 0 0 0 3px rgba(49,94,251,.15); }
+
+/* 로그인 버튼 */
+#kc-login, .pf-c-button.pf-m-primary, .btn-primary {
+  background: var(--pg-blue); border: 1px solid var(--pg-blue); border-radius: 8px;
+  height: 44px; font-size: 15px; font-weight: 700; color: #fff;
+}
+#kc-login:hover, .pf-c-button.pf-m-primary:hover, .btn-primary:hover { background: #2448d8; border-color: #2448d8; }
+
+/* 오류·안내 */
+.alert-error, .pf-c-alert.pf-m-danger { border-radius: 8px; }
+#input-error, .kc-feedback-text { color: var(--pg-red); }
+
+/* 언어 선택은 숨김 (기본 한국어) */
+#kc-locale { display: none; }
