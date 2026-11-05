@@ -48,3 +48,5 @@
   height: 42px; border: 1px solid var(--pg-line); border-left: 0; border-radius: 0 8px 8px 0; background: #fff;
 }
 .pf-c-input-group .pf-c-button.pf-m-control::after { border: 0; }
+.login-pf-page .pf-c-input-group input[type=password],
+.login-pf-page .pf-c-input-group input[type=text] { border-radius: 8px 0 0 8px; }
