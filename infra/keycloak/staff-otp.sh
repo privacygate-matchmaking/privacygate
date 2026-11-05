@@ -13,7 +13,9 @@ $KC config credentials --server http://keycloak:8080 --realm master \
 for u in $STAFF; do
   id=$($KC get users -r "$REALM" -q username="$u" -q exact=true --fields id --format csv --noquotes)
   [ -n "$id" ] || { echo "사용자 없음: $u"; continue; }
-  otp_ids=$($KC get "users/$id/credentials" -r "$REALM" --fields id,type --format csv --noquotes | awk -F, '$2=="otp"{print $1}')
+  # keycloak 이미지에는 awk 가 없어 bash 로 OTP 자격증명 id 만 고른다
+  otp_ids=$($KC get "users/$id/credentials" -r "$REALM" --fields id,type --format csv --noquotes \
+    | while IFS=, read -r cid ctype; do if [ "$ctype" = "otp" ]; then echo "$cid"; fi; done)
   if [ "${REQUIRE_STAFF_OTP:-true}" = "false" ]; then
     $KC update "users/$id" -r "$REALM" -s 'requiredActions=[]'
     for c in $otp_ids; do $KC delete "users/$id/credentials/$c" -r "$REALM"; done
