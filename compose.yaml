@@ -69,7 +69,7 @@ services:
         privacygate: .
     environment:
       <<: *oidc_discovery
-      DATABASE_URL: postgresql://pg_app:${BUSINESS_DB_APP_PASSWORD:?}@business-db:5432/matchmaking_business
+      DATABASE_URL: postgresql://app_user:${BUSINESS_DB_APP_PASSWORD:?}@business-db:5432/matchmaking_business
       OIDC_CLIENT_ID: internal-web
       OIDC_CLIENT_SECRET: ${INTERNAL_WEB_CLIENT_SECRET:?}
       APP_BASE_URL: ${INTERNAL_BASE_URL:-https://localhost:8080}
@@ -92,7 +92,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: matchmaking_business
-      POSTGRES_USER: pg_owner
+      POSTGRES_USER: db_owner
       POSTGRES_PASSWORD: ${BUSINESS_DB_OWNER_PASSWORD:?}
       APP_DB_PASSWORD: ${BUSINESS_DB_APP_PASSWORD:?}
     volumes:
@@ -100,7 +100,7 @@ services:
       - business-db-data:/var/lib/postgresql/data
     networks: [business-net]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pg_owner -d matchmaking_business"]
+      test: ["CMD-SHELL", "pg_isready -U db_owner -d matchmaking_business"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -114,7 +114,7 @@ services:
         privacygate: .
     environment:
       <<: *oidc_discovery
-      DATABASE_URL: postgresql://pg_app:${TRANSFER_DB_APP_PASSWORD:?}@transfer-db:5432/matchmaking_transfer
+      DATABASE_URL: postgresql://app_user:${TRANSFER_DB_APP_PASSWORD:?}@transfer-db:5432/matchmaking_transfer
       OIDC_CLIENT_ID: transfer-api
       OIDC_CLIENT_SECRET: ${TRANSFER_API_CLIENT_SECRET:?}
       API_AUDIENCE: transfer-api
@@ -134,7 +134,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: matchmaking_transfer
-      POSTGRES_USER: pg_owner
+      POSTGRES_USER: db_owner
       POSTGRES_PASSWORD: ${TRANSFER_DB_OWNER_PASSWORD:?}
       APP_DB_PASSWORD: ${TRANSFER_DB_APP_PASSWORD:?}
     volumes:
@@ -142,7 +142,7 @@ services:
       - transfer-db-data:/var/lib/postgresql/data
     networks: [transfer-db-net]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pg_owner -d matchmaking_transfer"]
+      test: ["CMD-SHELL", "pg_isready -U db_owner -d matchmaking_transfer"]
       interval: 5s
       timeout: 3s
       retries: 20
