@@ -18,7 +18,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .audit import AuditWriter
 from .errors import ErrorCode, GateError, error_body
-from .policy import Principal, is_allowed
+from . import gate_mode
+from .policy import STAFF_ROLES, Principal, is_allowed
 
 _log = logging.getLogger("privacygate.web")
 POLICY_ATTR = "__privacygate_policy__"
@@ -82,12 +83,17 @@ def install(app: FastAPI, audit: AuditWriter) -> None:
 def role_guard(principal_dependency: Callable[..., Principal]):
     """principal_dependency 로 로그인 사용자를 얻은 뒤 허용 역할을 확인하는 require(*roles) 를 만든다."""
 
-    def require(*roles):
+    def require(*roles, baseline_open: bool = False):
+        """baseline_open=True 인 경로만 GATE_MODE=baseline 에서 역할 검사를 건너뛴다 (로그인한 직원이면 통과).
+        시연 비교용이며 기본(enforce)에서는 아무 영향이 없다."""
         allowed = frozenset(r.value if hasattr(r, "value") else r for r in roles)
 
         def dependency(request: Request,
                        principal: Principal = Depends(principal_dependency)) -> Principal:
             if not is_allowed(principal.role, allowed):
+                if baseline_open and gate_mode.is_baseline() and principal.role in STAFF_ROLES:
+                    request.state.gate_bypass = "baseline_role_check_off"
+                    return principal
                 raise GateError(ErrorCode.ACCESS_DENIED, "role_not_allowed")
             return principal
 

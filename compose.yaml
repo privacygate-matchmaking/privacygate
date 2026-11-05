@@ -90,6 +90,7 @@ services:
       OIDC_CLIENT_SECRET: ${INTERNAL_WEB_CLIENT_SECRET:?}
       APP_BASE_URL: ${INTERNAL_BASE_URL:-https://localhost:8080}
       API_AUDIENCE: internal-api
+      GATE_MODE: ${GATE_MODE:-enforce}          # enforce(기본) / baseline(시연 비교용)
       TRANSFER_API_URL: http://transfer-api:8000
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       SESSION_IDLE_SECONDS: "1800"
@@ -134,6 +135,7 @@ services:
       OIDC_CLIENT_ID: transfer-api
       OIDC_CLIENT_SECRET: ${TRANSFER_API_CLIENT_SECRET:?}
       API_AUDIENCE: transfer-api
+      GATE_MODE: ${GATE_MODE:-enforce}
       INTERNAL_API_URL: http://internal-api:8000
       AUDIT_LOG_PATH: /var/log/matchmaking/transfer-api.json
     volumes:

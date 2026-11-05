@@ -157,5 +157,43 @@ class RoleFromClaims(unittest.TestCase):
         self.assertIsNone(role_from_claims({"realm_access": {"roles": ["approver", "data_admin"]}}))
 
 
+class GateMode(unittest.TestCase):
+    def test_default_enforce(self):
+        from privacygate import gate_mode
+        self.assertEqual(gate_mode.current({}), "enforce")
+        self.assertFalse(gate_mode.is_baseline({}))
+
+    def test_baseline_and_invalid(self):
+        from privacygate import gate_mode
+        self.assertTrue(gate_mode.is_baseline({"GATE_MODE": "baseline"}))
+        with self.assertRaises(RuntimeError):
+            gate_mode.current({"GATE_MODE": "off"})
+
+
+class BaselineDelivery(unittest.TestCase):
+    """baseline 은 수신자만 확인 → 공격 ②(다른 file_id) 가 통과한다. enforce 는 막는다."""
+    def setUp(self):
+        from datetime import datetime, timedelta, timezone
+        from privacygate.transfer_rules import ApprovedDelivery
+        self.now = datetime(2026, 11, 20, tzinfo=timezone.utc)
+        self.d = ApprovedDelivery("d1", "member-b", "approved", self.now + timedelta(days=1),
+                                  "file-ok", 1, "h", True)
+
+    def test_attack2_blocked_in_enforce(self):
+        from privacygate.transfer_rules import delivery_problem
+        self.assertEqual(delivery_problem(self.d, None, requester_id="member-b", now=self.now,
+                                          requested_file_id="file-leak")[1], "requested_file_not_approved")
+
+    def test_attack2_passes_in_baseline(self):
+        from privacygate.transfer_rules import delivery_problem
+        self.assertIsNone(delivery_problem(self.d, None, requester_id="member-b", now=self.now,
+                                           requested_file_id="file-leak", baseline=True))
+
+    def test_baseline_still_checks_recipient(self):
+        from privacygate.transfer_rules import delivery_problem
+        self.assertEqual(delivery_problem(self.d, None, requester_id="someone", now=self.now,
+                                          baseline=True)[1], "recipient_mismatch")
+
+
 if __name__ == "__main__":
     unittest.main()

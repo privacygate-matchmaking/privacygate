@@ -72,6 +72,7 @@ class Https(unittest.TestCase):
             self.assertRegex(env, rf"(?m)^{key}=https://")
         self.assertRegex(env, r"(?m)^COOKIE_SECURE=true$")
         self.assertRegex(env, r"(?m)^REQUIRE_STAFF_OTP=true$")   # 기본값은 OTP 켜짐
+        self.assertRegex(env, r"(?m)^GATE_MODE=enforce$")         # 기본값은 통제 켜짐
 
 
 class Gitignore(unittest.TestCase):

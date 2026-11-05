@@ -33,10 +33,17 @@ class StoredFile:
 
 
 def delivery_problem(d: ApprovedDelivery, stored: StoredFile | None, *, requester_id: str,
-                     now: datetime, requested_file_id: str | None = None) -> tuple[ErrorCode, str] | None:
-    """제공할 수 없으면 (오류 코드, 감사용 사유), 제공 가능하면 None."""
+                     now: datetime, requested_file_id: str | None = None,
+                     baseline: bool = False) -> tuple[ErrorCode, str] | None:
+    """제공할 수 없으면 (오류 코드, 감사용 사유), 제공 가능하면 None.
+
+    baseline=True (GATE_MODE=baseline, 시연 비교용): 수신자만 확인한다.
+    호출하는 쪽은 이때 요청의 file_id 를 그대로 제공하게 되며, 이것이 공격 ②가 노리는 취약 동작이다.
+    """
     if requester_id != d.recipient_id:
         return ErrorCode.APPROVAL_MISMATCH, "recipient_mismatch"
+    if baseline:
+        return None
     if requested_file_id is not None and requested_file_id != d.approved_file_id:
         return ErrorCode.APPROVAL_MISMATCH, "requested_file_not_approved"
     if d.request_status in ("revoked", "rejected", "pending"):
