@@ -51,6 +51,21 @@ services:
       retries: 30
       start_period: 30s
 
+  # 직원 OTP 강제 여부 적용 (.env REQUIRE_STAFF_OTP, 기본 true). 실행 후 종료되는 일회성 작업
+  keycloak-setup:
+    image: quay.io/keycloak/keycloak:26.0.7
+    entrypoint: ["/bin/bash", "/opt/setup/staff-otp.sh"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
+      REQUIRE_STAFF_OTP: ${REQUIRE_STAFF_OTP:-true}
+    volumes:
+      - ./infra/keycloak/staff-otp.sh:/opt/setup/staff-otp.sh:ro
+    networks: [auth-internal-net]
+    depends_on:
+      keycloak: { condition: service_healthy }
+    restart: "no"
+
   # ---------- 내부 영역 (../matchmaking-internal) ----------
   internal-web:
     image: nginxinc/nginx-unprivileged:1.27-alpine
