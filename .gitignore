@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+.DS_Store
+
+# 비밀값 — 절대 커밋하지 않음
+.env
+infra/secrets/*
+!infra/secrets/.gitkeep
+*.key
+*.pem
+*.log

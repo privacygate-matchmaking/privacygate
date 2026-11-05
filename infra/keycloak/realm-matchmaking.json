@@ -1,0 +1,272 @@
+{
+  "realm": "matchmaking",
+  "displayName": "PrivacyGate 결혼정보회사 (가상)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "permanentLockout": false,
+  "passwordPolicy": "length(12) and notUsername",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "roles": {
+    "realm": [
+      {
+        "name": "counselor",
+        "description": "상담 직원: 담당 회원 조회, 반출 신청"
+      },
+      {
+        "name": "data_admin",
+        "description": "데이터 관리자: 전체 회원 내보내기, 배정 증빙 심사 (승인 권한 없음)"
+      },
+      {
+        "name": "approver",
+        "description": "반출 승인자: 검토·승인·거절·회수 (내보내기·원본 열람 없음)"
+      },
+      {
+        "name": "member",
+        "description": "회원"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "internal-web",
+      "name": "내부 업무 화면 (BFF: internal-api)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${INTERNAL_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "${INTERNAL_BASE_URL}/auth/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${INTERNAL_BASE_URL}/"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-transfer-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "transfer-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "external-web",
+      "name": "외부 회원 화면 (BFF: external-api)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${EXTERNAL_WEB_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "${EXTERNAL_BASE_URL}/auth/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${EXTERNAL_BASE_URL}/"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-transfer-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "transfer-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "aud-internal-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "internal-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "transfer-api",
+      "name": "중계 서버 (서비스 계정: internal-api 호출용)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TRANSFER_API_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "aud-internal-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "internal-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "external-api",
+      "name": "외부 백엔드 (서비스 계정: transfer-api 호출용)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${EXTERNAL_API_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "aud-transfer-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "transfer-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "internal-api",
+      "name": "내부 업무 API (토큰 대상으로만 사용)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "id": "11111111-1111-4111-8111-111111111101",
+      "username": "counselor_a",
+      "enabled": true,
+      "email": "counselor_a@example.test",
+      "emailVerified": true,
+      "firstName": "상담",
+      "lastName": "직원 A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "counselor"
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ]
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111102",
+      "username": "data_admin",
+      "enabled": true,
+      "email": "data_admin@example.test",
+      "emailVerified": true,
+      "firstName": "데이터",
+      "lastName": "관리자",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "data_admin"
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ]
+    },
+    {
+      "id": "11111111-1111-4111-8111-111111111103",
+      "username": "approver",
+      "enabled": true,
+      "email": "approver@example.test",
+      "emailVerified": true,
+      "firstName": "반출",
+      "lastName": "승인자",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "approver"
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ]
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222201",
+      "username": "member_b",
+      "enabled": true,
+      "email": "member_b@example.test",
+      "emailVerified": true,
+      "firstName": "회원",
+      "lastName": "B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "member"
+      ]
+    }
+  ]
+}

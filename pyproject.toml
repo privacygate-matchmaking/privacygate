@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "privacygate"
+version = "0.1.0"
+description = "PrivacyGate: 개인정보 접근·반출 통제 공통 보안 모듈"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# FastAPI 연동(privacygate.web)과 서비스 토큰 검증을 쓸 때
+web = ["fastapi>=0.110", "PyJWT[crypto]>=2.8"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

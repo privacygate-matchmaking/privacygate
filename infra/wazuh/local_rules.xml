@@ -1,0 +1,53 @@
+<!--
+  PrivacyGate Wazuh 사용자 규칙 — 초안 (4주차에 실제 Wazuh 에 적용·조정)
+  입력: internal-api / transfer-api / external-api 가 audit-logs 볼륨에 쓰는 JSON 한 줄 로그
+  필드: ts, service, trace_id, actor, role, action, target_type, target_id, result, reason
+  경보는 탐지 확인용이다. 차단은 API 가 하며, 경보만으로 방어 성공을 판단하지 않는다.
+-->
+<group name="privacygate,">
+
+  <rule id="100100" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="service">^internal-api$|^transfer-api$|^external-api$</field>
+    <description>PrivacyGate 감사 이벤트</description>
+  </rule>
+
+  <rule id="100101" level="5">
+    <if_sid>100100</if_sid>
+    <field name="result">^deny$</field>
+    <description>PrivacyGate 접근 거부: $(action) ($(reason))</description>
+  </rule>
+
+  <!-- 공격 ①: counselor 가 관리자 내보내기 API 직접 호출 -->
+  <rule id="100110" level="10">
+    <if_sid>100101</if_sid>
+    <field name="action">^POST /api/admin/member-exports$</field>
+    <description>PrivacyGate: 권한 없는 전체 회원 내보내기 시도 (공격 ① 의심)</description>
+    <group>privacygate_attack,</group>
+  </rule>
+
+  <!-- 공격 ②: 승인 건과 다른 file_id 로 다운로드 요청 -->
+  <rule id="100111" level="10">
+    <if_sid>100101</if_sid>
+    <field name="reason">^requested_file_not_approved$|^recipient_mismatch$</field>
+    <description>PrivacyGate: 승인 범위 밖 파일 다운로드 시도 (공격 ② 의심)</description>
+    <group>privacygate_attack,</group>
+  </rule>
+
+  <!-- 같은 계정 반복 거부 1분 3회 -->
+  <rule id="100112" level="10" frequency="3" timeframe="60">
+    <if_matched_sid>100101</if_matched_sid>
+    <same_field>actor</same_field>
+    <description>PrivacyGate: 같은 계정의 거부가 1분 안에 3회 이상</description>
+    <group>privacygate_attack,</group>
+  </rule>
+
+  <!-- 기한 도래 증빙 삭제 실패 -->
+  <rule id="100113" level="8">
+    <if_sid>100100</if_sid>
+    <field name="action">^evidence_delete$</field>
+    <field name="result">^error$</field>
+    <description>PrivacyGate: 기한 도래 증빙 삭제 실패</description>
+  </rule>
+
+</group>

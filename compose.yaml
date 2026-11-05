@@ -1,0 +1,209 @@
+# PrivacyGate 전체 실행 환경 (privacygate 레포에 둔다)
+# 폴더 배치: 같은 상위 폴더에 matchmaking-internal / matchmaking-external / privacygate 를 나란히 clone
+# 실행(privacygate 폴더에서): ./infra/scripts/init-env.sh  →  docker compose up -d --build
+#   내부만: docker compose up -d --build   (keycloak, internal-web, internal-api, business-db)
+#   전체:   docker compose --profile external up -d --build   (../matchmaking-external 필요)
+#
+# 네트워크 원칙
+# - public-* 만 호스트 포트(127.0.0.1, HTTPS)를 연다. 내부망 구간 TLS 는 2주차 예정. 나머지는 internal: true (인터넷·호스트와 단절).
+# - external-api 는 internal-api·business-db·transfer-db·evidence-storage 와 어떤 네트워크도 공유하지 않는다.
+#   외부에서 내부 자료로 가는 길은 transfer-api 하나뿐이다.
+
+name: matchmaking
+
+x-oidc: &oidc_discovery
+  OIDC_DISCOVERY_URL: http://keycloak:8080/realms/matchmaking/.well-known/openid-configuration
+
+services:
+  # ---------- 인증 ----------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
+      KC_HOSTNAME: ${KC_PUBLIC_URL:-https://localhost:8081}  # 브라우저가 보는 주소(HTTPS) = 토큰 iss
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"                # 컨테이너는 내부망에서 keycloak:8080 으로 접근
+      KC_HTTP_ENABLED: "true"                                # 8080(http)은 내부망 전용, 호스트에 공개 안 함
+      KC_HTTPS_PORT: "8443"
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/conf/tls/cert.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/tls/key.pem
+      KC_HEALTH_ENABLED: "true"
+      KC_LEGACY_OBSERVABILITY_INTERFACE: "true"              # health 를 8080(http)에서 확인
+      # realm 파일 ${...} 자리표시자 값
+      KC_TEST_PASSWORD: ${KC_TEST_PASSWORD:?}
+      INTERNAL_WEB_CLIENT_SECRET: ${INTERNAL_WEB_CLIENT_SECRET:?}
+      EXTERNAL_WEB_CLIENT_SECRET: ${EXTERNAL_WEB_CLIENT_SECRET:?}
+      TRANSFER_API_CLIENT_SECRET: ${TRANSFER_API_CLIENT_SECRET:?}
+      EXTERNAL_API_CLIENT_SECRET: ${EXTERNAL_API_CLIENT_SECRET:?}
+      INTERNAL_BASE_URL: ${INTERNAL_BASE_URL:-https://localhost:8080}
+      EXTERNAL_BASE_URL: ${EXTERNAL_BASE_URL:-https://localhost:8090}
+    volumes:
+      - ./infra/keycloak/realm-matchmaking.json:/opt/keycloak/data/import/realm-matchmaking.json:ro
+      - keycloak-data:/opt/keycloak/data/h2
+      - ./infra/secrets/tls:/opt/keycloak/conf/tls:ro
+    ports: ["127.0.0.1:8081:8443"]          # 브라우저는 HTTPS 로만
+    networks: [public-auth, auth-internal-net, auth-external-net]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # ---------- 내부 영역 (../matchmaking-internal) ----------
+  internal-web:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    volumes:
+      - ../matchmaking-internal/internal-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../matchmaking-internal/internal-web/public:/usr/share/nginx/html:ro
+      - ./infra/secrets/tls:/etc/nginx/tls:ro
+    ports: ["127.0.0.1:8080:8443"]          # HTTPS
+    networks: [public-internal, internal-web-net]
+    depends_on: [internal-api]
+
+  internal-api:
+    build:
+      context: ../matchmaking-internal/internal-api
+      additional_contexts:
+        privacygate: .
+    environment:
+      <<: *oidc_discovery
+      DATABASE_URL: postgresql://pg_app:${BUSINESS_DB_APP_PASSWORD:?}@business-db:5432/matchmaking_business
+      OIDC_CLIENT_ID: internal-web
+      OIDC_CLIENT_SECRET: ${INTERNAL_WEB_CLIENT_SECRET:?}
+      APP_BASE_URL: ${INTERNAL_BASE_URL:-https://localhost:8080}
+      API_AUDIENCE: internal-api
+      TRANSFER_API_URL: http://transfer-api:8000
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SESSION_IDLE_SECONDS: "1800"
+      SESSION_MAX_SECONDS: "28800"
+      AUDIT_LOG_PATH: /var/log/matchmaking/internal-api.json
+    volumes:
+      - audit-logs:/var/log/matchmaking
+      - evidence-storage:/data/evidence-storage
+    secrets: [evidence_master_key]
+    networks: [internal-web-net, business-net, transfer-net, auth-internal-net]
+    depends_on:
+      business-db: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+
+  business-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: matchmaking_business
+      POSTGRES_USER: pg_owner
+      POSTGRES_PASSWORD: ${BUSINESS_DB_OWNER_PASSWORD:?}
+      APP_DB_PASSWORD: ${BUSINESS_DB_APP_PASSWORD:?}
+    volumes:
+      - ./infra/db/business:/docker-entrypoint-initdb.d:ro
+      - business-db-data:/var/lib/postgresql/data
+    networks: [business-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg_owner -d matchmaking_business"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------- 중계 영역 (../matchmaking-external/transfer-api) ----------
+  transfer-api:
+    profiles: [external]          # matchmaking-external 레포가 있을 때만 (--profile external)
+    build:
+      context: ../matchmaking-external/transfer-api
+      additional_contexts:
+        privacygate: .
+    environment:
+      <<: *oidc_discovery
+      DATABASE_URL: postgresql://pg_app:${TRANSFER_DB_APP_PASSWORD:?}@transfer-db:5432/matchmaking_transfer
+      OIDC_CLIENT_ID: transfer-api
+      OIDC_CLIENT_SECRET: ${TRANSFER_API_CLIENT_SECRET:?}
+      API_AUDIENCE: transfer-api
+      INTERNAL_API_URL: http://internal-api:8000
+      AUDIT_LOG_PATH: /var/log/matchmaking/transfer-api.json
+    volumes:
+      - audit-logs:/var/log/matchmaking
+      - transfer-staging:/data/transfer-staging
+      - transfer-verified:/data/transfer-verified
+    networks: [transfer-net, delivery-net, transfer-db-net, auth-internal-net]
+    depends_on:
+      transfer-db: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+
+  transfer-db:
+    profiles: [external]          # matchmaking-external 레포가 있을 때만 (--profile external)
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: matchmaking_transfer
+      POSTGRES_USER: pg_owner
+      POSTGRES_PASSWORD: ${TRANSFER_DB_OWNER_PASSWORD:?}
+      APP_DB_PASSWORD: ${TRANSFER_DB_APP_PASSWORD:?}
+    volumes:
+      - ./infra/db/transfer:/docker-entrypoint-initdb.d:ro
+      - transfer-db-data:/var/lib/postgresql/data
+    networks: [transfer-db-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pg_owner -d matchmaking_transfer"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ---------- 외부 영역 (../matchmaking-external) ----------
+  external-web:
+    profiles: [external]          # matchmaking-external 레포가 있을 때만 (--profile external)
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    volumes:
+      - ../matchmaking-external/external-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../matchmaking-external/external-web/public:/usr/share/nginx/html:ro
+      - ./infra/secrets/tls:/etc/nginx/tls:ro
+    ports: ["127.0.0.1:8090:8443"]          # HTTPS
+    networks: [public-external, external-net]
+    depends_on: [external-api]
+
+  external-api:
+    profiles: [external]          # matchmaking-external 레포가 있을 때만 (--profile external)
+    build:
+      context: ../matchmaking-external/external-api
+    environment:
+      <<: *oidc_discovery
+      OIDC_CLIENT_ID: external-web
+      OIDC_CLIENT_SECRET: ${EXTERNAL_WEB_CLIENT_SECRET:?}
+      SERVICE_CLIENT_ID: external-api
+      SERVICE_CLIENT_SECRET: ${EXTERNAL_API_CLIENT_SECRET:?}
+      APP_BASE_URL: ${EXTERNAL_BASE_URL:-https://localhost:8090}
+      TRANSFER_API_URL: http://transfer-api:8000
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      AUDIT_LOG_PATH: /var/log/matchmaking/external-api.json
+    volumes:
+      - audit-logs:/var/log/matchmaking
+    networks: [external-net, delivery-net, auth-external-net]
+    depends_on:
+      keycloak: { condition: service_healthy }
+
+networks:
+  # 브라우저 진입점 (호스트 127.0.0.1 포트만)
+  public-internal: {}
+  public-external: {}
+  public-auth: {}
+  # 문서에 정한 3개 망
+  business-net:      { internal: true }   # internal-api ↔ business-db
+  transfer-net:      { internal: true }   # internal-api ↔ transfer-api
+  external-net:      { internal: true }   # external-web ↔ external-api
+  # 보조 망 (서비스 쌍마다 하나)
+  internal-web-net:  { internal: true }   # internal-web ↔ internal-api
+  delivery-net:      { internal: true }   # external-api ↔ transfer-api
+  transfer-db-net:   { internal: true }   # transfer-api ↔ transfer-db
+  auth-internal-net: { internal: true }   # keycloak ↔ internal-api, transfer-api
+  auth-external-net: { internal: true }   # keycloak ↔ external-api
+
+volumes:
+  keycloak-data:
+  business-db-data:
+  transfer-db-data:
+  evidence-storage:      # 증빙 암호문 (internal-api 만)
+  transfer-staging:      # 검사 전 반출 파일 (transfer-api 만)
+  transfer-verified:     # 검사 통과 파일 (transfer-api 만)
+  audit-logs:            # JSON 감사 로그 → 4주차 Wazuh 수집
+
+secrets:
+  evidence_master_key:
+    file: ./infra/secrets/evidence_master.key   # 증빙 AES-GCM 키 (Git·DB 에 넣지 않음)
