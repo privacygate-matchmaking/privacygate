@@ -40,7 +40,7 @@ services:
       EXTERNAL_BASE_URL: ${EXTERNAL_BASE_URL:-https://localhost:8090}
     volumes:
       - ./infra/keycloak/realm-matchmaking.json:/opt/keycloak/data/import/realm-matchmaking.json:ro
-      - keycloak-data:/opt/keycloak/data/h2
+      - keycloak-data:/opt/keycloak/data
       - ./infra/secrets/tls:/opt/keycloak/conf/tls:ro
     ports: ["127.0.0.1:8081:8443"]          # 브라우저는 HTTPS 로만
     networks: [public-auth, auth-internal-net, auth-external-net]
