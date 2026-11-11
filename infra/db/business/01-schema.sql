@@ -48,6 +48,8 @@ CREATE TABLE members (
     status               text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdraw_pending')),
     withdraw_requested_at timestamptz,                             -- 탈퇴 요청 시각 (유예 시작)
     withdraw_at          timestamptz,                              -- 이 시각이 지나면 회원 정보를 DB 에서 삭제 (유예 7일)
+    withdraw_requested_by uuid REFERENCES users(user_id),          -- 탈퇴를 요청한 직원 (총관리자가 요청한 건은 상담 직원이 철회 불가)
+    withdraw_reason      text,                                     -- 탈퇴 사유 (선택)
     created_at           timestamptz NOT NULL DEFAULT now()
 );
 
