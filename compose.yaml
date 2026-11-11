@@ -60,6 +60,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
       KC_TEST_PASSWORD: ${KC_TEST_PASSWORD:?}
+      INTERNAL_ADMIN_CLIENT_SECRET: ${INTERNAL_ADMIN_CLIENT_SECRET:?}
     volumes:
       - ./infra/keycloak/realm-setup.sh:/opt/setup/realm-setup.sh:ro
     networks: [auth-internal-net]
@@ -96,6 +97,10 @@ services:
       SESSION_IDLE_SECONDS: "1800"
       SESSION_MAX_SECONDS: "28800"
       AUDIT_LOG_PATH: /var/log/matchmaking/internal-api.json
+      # 탈퇴 확정 회원의 Keycloak 세션 종료·계정 삭제 (internal-admin client)
+      KC_ADMIN_CLIENT_ID: internal-admin
+      KC_ADMIN_CLIENT_SECRET: ${INTERNAL_ADMIN_CLIENT_SECRET:?}
+      MEMBER_NOTICE_DAYS: ${MEMBER_NOTICE_DAYS:-30}   # 탈퇴 안내 기간(일). 지나면 Keycloak 계정 삭제. 0 이면 바로 삭제
     volumes:
       - audit-logs:/var/log/matchmaking
       - evidence-storage:/data/evidence-storage

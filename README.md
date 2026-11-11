@@ -43,6 +43,13 @@ HTTPS 인증서는 `init-env.sh` 가 만든다. [mkcert](https://github.com/Filo
 - 직원: `<A~Z>-<역할><2자리>` — 역할 C=상담, D=총관리자(data_admin), P=승인 (예: `A-C01`, `A-D01`, `A-P01`)
 - 회원: `<A~Z>-<3자리>` — `A-001` … `A-999` 다음 `B-001` (DB 가 자동 발급)
 
+회원 탈퇴: 직원·총관리자 처리 또는 회원 본인 신청 → 7일 유예 후 회원 정보 삭제. 삭제 시 그 회원의 Keycloak 세션을 끊고,
+`MEMBER_NOTICE_DAYS`(기본 30일) 동안은 로그인하면 "탈퇴된 계정" 안내만 보이며, 그 뒤 Keycloak 계정도 지운다
+(전용 client `internal-admin`, `.env` 의 `INTERNAL_ADMIN_CLIENT_SECRET`).
+
+권한 동작 시험 (내부 스택 실행 중, 시드 데이터 상태):
+`docker compose exec -T internal-api python - < ../matchmaking-internal/tests/test_permissions.py`
+
 시험 데이터를 처음 상태로 되돌리기 (업무 DB·중계 DB·Keycloak·증빙 저장소 모두 초기화): `docker compose ... down -v` 후 다시 `up -d --build`
 서비스 이미지에는 이 레포의 `pyproject.toml`·`README.md`·`src/` 만 복사된다 (`.env`·`infra/` 는 들어가지 않음).
 
