@@ -207,6 +207,28 @@
       ]
     },
     {
+      "id": "11111111-1111-4111-8111-111111111104",
+      "username": "counselor_b",
+      "enabled": true,
+      "email": "counselor_b@example.test",
+      "emailVerified": true,
+      "firstName": "상담",
+      "lastName": "직원 B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_TEST_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "counselor"
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ]
+    },
+    {
       "id": "11111111-1111-4111-8111-111111111102",
       "username": "data_admin",
       "enabled": true,

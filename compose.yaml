@@ -60,6 +60,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
       REQUIRE_STAFF_OTP: ${REQUIRE_STAFF_OTP:-true}
+      KC_TEST_PASSWORD: ${KC_TEST_PASSWORD:?}
     volumes:
       - ./infra/keycloak/realm-setup.sh:/opt/setup/realm-setup.sh:ro
     networks: [auth-internal-net]

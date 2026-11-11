@@ -3,6 +3,7 @@ INSERT INTO users (user_id, pseudo_id, display_name, role) VALUES
   ('11111111-1111-4111-8111-111111111101', 'S-C01', 'counselor_a',  'counselor'),
   ('11111111-1111-4111-8111-111111111102', 'S-D01', 'data_admin',   'data_admin'),
   ('11111111-1111-4111-8111-111111111103', 'S-P01', 'approver',     'approver'),
+  ('11111111-1111-4111-8111-111111111104', 'S-C02', 'counselor_b',  'counselor'),
   ('22222222-2222-4222-8222-222222222201', 'M-B01', 'member_b',     'member');
 
 INSERT INTO members (member_id, user_id, pseudo_id, name, birth_year, job, contact_phone, contact_email) VALUES
@@ -16,7 +17,7 @@ INSERT INTO members (member_id, user_id, pseudo_id, name, birth_year, job, conta
   ('bbbbbbbb-0000-4000-8000-000000000007', NULL, 'M-007', '가상회원07', 1997, '디자이너', '010-0000-0007', 'm07@example.test'),
   ('bbbbbbbb-0000-4000-8000-000000000008', NULL, 'M-008', '가상회원08', 1990, '약사',     '010-0000-0008', 'm08@example.test');
 
--- counselor_a 는 회원 1~3 만 담당 (member_b = 회원 3)
+-- counselor_a 는 회원 1~3 고정 담당 (member_b = 회원 3). 나머지 회원은 04-auto-assign.sql 이 무작위 배정
 INSERT INTO assignments (user_id, member_id) VALUES
   ('11111111-1111-4111-8111-111111111101', 'bbbbbbbb-0000-4000-8000-000000000001'),
   ('11111111-1111-4111-8111-111111111101', 'bbbbbbbb-0000-4000-8000-000000000002'),
