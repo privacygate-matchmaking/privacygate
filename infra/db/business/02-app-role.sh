@@ -7,7 +7,7 @@ REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_user;
 GRANT SELECT ON users, members, assignments, introductions TO app_user;
 -- 회원 관리: 허용 항목 수정과 탈퇴(이름·연락처 삭제)만. 회원 행 삭제는 불가
-GRANT UPDATE (nickname, birth_date, height_cm, weight_kg, education_level, school, major, job_group, company, introduction,
+GRANT UPDATE (birth_date, height_cm, weight_kg, education_level, school, major, job_group, company, introduction,
               education_verified, employment_verified, name, contact_phone, contact_email, status, withdrawn_at) ON members TO app_user;
 GRANT SELECT, INSERT, UPDATE ON matches TO app_user;
 GRANT SELECT, INSERT, UPDATE ON member_exports TO app_user;

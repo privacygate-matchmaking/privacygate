@@ -17,7 +17,6 @@ CREATE TABLE members (
     member_id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id              uuid UNIQUE REFERENCES users(user_id),   -- 외부 로그인 계정이 있는 회원만
     pseudo_id            text UNIQUE NOT NULL,                     -- 회원 코드 (감사 로그·중계 연동용)
-    nickname             text UNIQUE NOT NULL,                     -- 닉네임(가명): 매칭 전 상대에게 보이는 이름
     name                 text NOT NULL,                            -- 실명: 매칭·제공 후에만
     birth_date           date,                                     -- 매칭 전에는 만 나이만 공개
     height_cm            smallint CHECK (height_cm BETWEEN 120 AND 230),   -- 본인 신고
