@@ -5,18 +5,31 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- 사용자: user_id = Keycloak sub. 업무 역할은 토큰이 아니라 여기서 관리한다.
 CREATE TABLE users (
     user_id       uuid PRIMARY KEY,
-    pseudo_id     text UNIQUE NOT NULL,           -- 로그·화면용 가명 ID
+    pseudo_id     text UNIQUE NOT NULL            -- 코드: 직원 A-C01 (앞글자 A~Z + 역할 C/D/P/A + 2자리), 회원 계정은 회원 코드
+                  CHECK (pseudo_id ~ '^[A-Z]-([CDPA][0-9]{2}|[0-9]{3})$'),
     display_name  text NOT NULL,
     role          text NOT NULL CHECK (role IN ('counselor', 'data_admin', 'approver', 'member')),
     active        boolean NOT NULL DEFAULT true,
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- 회원 코드: 앞글자 A~Z + 3자리 순번 (A-001 … A-999 다음 B-001). 관리자 화면·감사 로그에서만 쓴다
+CREATE SEQUENCE member_code_seq;
+CREATE FUNCTION next_member_code() RETURNS text LANGUAGE plpgsql AS $$
+DECLARE n bigint := nextval('member_code_seq');
+BEGIN
+    IF n > 26 * 999 THEN
+        RAISE EXCEPTION 'member code exhausted';
+    END IF;
+    RETURN chr(65 + ((n - 1) / 999)::int) || '-' || lpad((((n - 1) % 999) + 1)::text, 3, '0');
+END $$;
+
 -- 회원 정보 (모두 합성 데이터)
 CREATE TABLE members (
     member_id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id              uuid UNIQUE REFERENCES users(user_id),   -- 외부 로그인 계정이 있는 회원만
-    pseudo_id            text UNIQUE NOT NULL,                     -- 회원 코드 (감사 로그·중계 연동용)
+    pseudo_id            text UNIQUE NOT NULL DEFAULT next_member_code()   -- 회원 코드 A-001 (관리자 전용)
+                         CHECK (pseudo_id ~ '^[A-Z]-[0-9]{3}$'),
     name                 text NOT NULL,                            -- 실명: 매칭·제공 후에만
     birth_date           date,                                     -- 매칭 전에는 만 나이만 공개
     height_cm            smallint CHECK (height_cm BETWEEN 120 AND 230),   -- 본인 신고
@@ -99,7 +112,7 @@ CREATE TABLE matches (
     CHECK (member_id <> counterpart_member_id)
 );
 
--- 소개 자료 발송: 중계의 file_id·request_id·approval_id(UUID)를 화면용 이름(M-001_file1)과 잇는다
+-- 소개 자료 발송: 중계의 file_id·request_id·approval_id(UUID)를 화면용 이름(A-001_file1)과 잇는다
 CREATE TABLE intro_files (
     label        text PRIMARY KEY,                             -- <회원 가명 ID>_file<순번>
     member_id    uuid NOT NULL REFERENCES members(member_id),

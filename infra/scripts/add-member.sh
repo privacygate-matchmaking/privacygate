@@ -1,14 +1,14 @@
 #!/bin/bash
-# 합성 회원을 무작위 값으로 N명(기본 1) 추가한다 (학력·재직 증빙은 미확인 상태). 담당 상담 직원은 DB 트리거가 무작위로 배정한다.
+# 합성 회원을 무작위 값으로 N명(기본 1) 추가한다 (학력·재직 증빙은 미확인 상태).
+# 회원 코드(A-011, A-012 …)는 DB 가 자동 발급한다. 담당 상담 직원은 DB 트리거가 무작위로 배정한다.
 # 사용: ./infra/scripts/add-member.sh [N]   (privacygate 폴더에서, business-db 가 실행 중일 때)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 n="${1:-1}"
 docker compose exec -T business-db psql -U db_owner -d matchmaking_business -v ON_ERROR_STOP=1 -v n="$n" <<'SQL'
-INSERT INTO members (pseudo_id, name, birth_date, height_cm, weight_kg, education_level,
+INSERT INTO members (name, birth_date, height_cm, weight_kg, education_level,
                      job_group, introduction, contact_phone, contact_email)
-SELECT 'M-' || code,
-       '가상회원-' || code,
+SELECT '가상회원-' || code,
        date '1985-01-01' + floor(random() * 15 * 365)::int,
        155 + floor(random() * 30)::int,
        45 + floor(random() * 35)::int,
