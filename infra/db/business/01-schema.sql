@@ -30,7 +30,8 @@ CREATE TABLE members (
     user_id              uuid UNIQUE REFERENCES users(user_id),   -- 외부 로그인 계정이 있는 회원만
     pseudo_id            text UNIQUE NOT NULL DEFAULT next_member_code()   -- 회원 코드 A-001 (관리자 전용)
                          CHECK (pseudo_id ~ '^[A-Z]-[0-9]{3}$'),
-    name                 text NOT NULL,                            -- 실명: 매칭·제공 후에만
+    name                 text NOT NULL,                            -- 실명: 직원 화면, 회원에게는 매칭·제공 후에만
+    gender               text CHECK (gender IN ('남', '여')),
     birth_date           date,                                     -- 매칭 전에는 만 나이만 공개
     height_cm            smallint CHECK (height_cm BETWEEN 120 AND 230),   -- 본인 신고
     weight_kg            smallint CHECK (weight_kg BETWEEN 30 AND 200),    -- 본인 신고
