@@ -45,8 +45,9 @@ CREATE TABLE members (
     employment_verified  boolean NOT NULL DEFAULT false,           -- 재직 증빙 통과 (직장 공개 조건)
     contact_phone        text,
     contact_email        text,
-    status               text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdrawn')),
-    withdrawn_at         timestamptz,                              -- 탈퇴 시 이름·연락처는 지우고 기록용 행만 남긴다
+    status               text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdraw_pending')),
+    withdraw_requested_at timestamptz,                             -- 탈퇴 요청 시각 (유예 시작)
+    withdraw_at          timestamptz,                              -- 이 시각이 지나면 회원 정보를 DB 에서 삭제 (유예 7일)
     created_at           timestamptz NOT NULL DEFAULT now()
 );
 
@@ -174,3 +175,34 @@ CREATE TABLE audit_log (
     result       text NOT NULL CHECK (result IN ('allow', 'deny', 'error')),
     reason       text
 );
+
+-- 회원 삭제(탈퇴 확정): 회원과 관련 행(동의·매칭·소개 관계·담당·증빙·소개 자료 기록·회원 로그인 계정 행)을 모두 지운다.
+-- 앱 계정(app_user)에는 각 테이블 DELETE 권한을 주지 않고 이 함수 실행 권한만 준다 (삭제 범위를 함수로 고정).
+-- 반환: 지워야 할 증빙 암호문 파일의 storage_key 목록 (파일 삭제는 internal-api 가 한다). 감사 로그는 남긴다.
+CREATE FUNCTION purge_member(p_member uuid) RETURNS TABLE (storage_key text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_user uuid;
+BEGIN
+    SELECT m.user_id INTO v_user FROM members m WHERE m.member_id = p_member FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+    RETURN QUERY SELECT e.storage_key FROM evidence_files e
+                  WHERE (e.member_id = p_member OR e.submitted_by = v_user) AND e.storage_key IS NOT NULL;
+    DELETE FROM evidence_reviews r USING evidence_files e
+     WHERE r.file_id = e.file_id AND (e.member_id = p_member OR e.submitted_by = v_user);
+    DELETE FROM evidence_files e WHERE e.member_id = p_member OR e.submitted_by = v_user;
+    DELETE FROM intro_files f WHERE f.member_id = p_member
+        OR f.consent_id IN (SELECT c.consent_id FROM consents c
+                             WHERE c.member_id = p_member OR c.counterpart_member_id = p_member);
+    DELETE FROM consents c WHERE c.member_id = p_member OR c.counterpart_member_id = p_member;
+    DELETE FROM matches x WHERE x.member_id = p_member OR x.counterpart_member_id = p_member;
+    DELETE FROM introductions i WHERE i.member_id = p_member OR i.counterpart_member_id = p_member;
+    DELETE FROM assignments a WHERE a.member_id = p_member;
+    DELETE FROM members m WHERE m.member_id = p_member;
+    IF v_user IS NOT NULL THEN
+        DELETE FROM sessions s WHERE s.user_id = v_user;
+        DELETE FROM users u WHERE u.user_id = v_user AND u.role = 'member';
+    END IF;
+END $$;
+REVOKE ALL ON FUNCTION purge_member(uuid) FROM PUBLIC;

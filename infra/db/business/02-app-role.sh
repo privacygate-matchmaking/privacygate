@@ -8,7 +8,10 @@ GRANT USAGE ON SCHEMA public TO app_user;
 GRANT SELECT ON users, members, assignments, introductions TO app_user;
 -- 회원 관리: 허용 항목 수정과 탈퇴(이름·연락처 삭제)만. 회원 행 삭제는 불가
 GRANT UPDATE (gender, birth_date, height_cm, weight_kg, education_level, school, major, job_group, company, introduction,
-              education_verified, employment_verified, name, contact_phone, contact_email, status, withdrawn_at) ON members TO app_user;
+              education_verified, employment_verified, name, contact_phone, contact_email,
+              status, withdraw_requested_at, withdraw_at) ON members TO app_user;
+-- 탈퇴 확정 삭제는 함수로만 (테이블 DELETE 권한 없음)
+GRANT EXECUTE ON FUNCTION purge_member(uuid) TO app_user;
 GRANT SELECT, INSERT, UPDATE ON matches TO app_user;
 GRANT SELECT, INSERT, UPDATE ON member_exports TO app_user;
 -- 동의: 회원이 등록·철회 (삭제는 불가, 철회는 revoked_at 기록)
