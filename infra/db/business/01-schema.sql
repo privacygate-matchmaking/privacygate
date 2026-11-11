@@ -22,6 +22,8 @@ CREATE TABLE members (
     job            text,
     contact_phone  text,
     contact_email  text,
+    status         text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdrawn')),
+    withdrawn_at   timestamptz,                             -- 탈퇴 시 이름·연락처는 지우고 기록용 행만 남긴다
     created_at     timestamptz NOT NULL DEFAULT now()
 );
 
@@ -72,6 +74,16 @@ CREATE TABLE introductions (
     member_id              uuid NOT NULL REFERENCES members(member_id),
     counterpart_member_id  uuid NOT NULL REFERENCES members(member_id),
     created_at             timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (member_id, counterpart_member_id),
+    CHECK (member_id <> counterpart_member_id)
+);
+
+-- 매칭: 회원이 소개된 상대에게 '매칭'을 누른 기록. 서로 누르면 양쪽 소개 자료 제공 동의가 만들어진다
+CREATE TABLE matches (
+    member_id              uuid NOT NULL REFERENCES members(member_id),
+    counterpart_member_id  uuid NOT NULL REFERENCES members(member_id),
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    cancelled_at           timestamptz,
     PRIMARY KEY (member_id, counterpart_member_id),
     CHECK (member_id <> counterpart_member_id)
 );

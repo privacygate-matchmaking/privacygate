@@ -4,6 +4,7 @@ INSERT INTO users (user_id, pseudo_id, display_name, role) VALUES
   ('11111111-1111-4111-8111-111111111102', 'S-D01', 'data_admin',   'data_admin'),
   ('11111111-1111-4111-8111-111111111103', 'S-P01', 'approver',     'approver'),
   ('11111111-1111-4111-8111-111111111104', 'S-C02', 'counselor_b',  'counselor'),
+  ('11111111-1111-4111-8111-111111111105', 'S-A01', 'super_admin',  'data_admin'),
   ('22222222-2222-4222-8222-222222222201', 'M-B01', 'member_b',     'member');
 
 INSERT INTO members (member_id, user_id, pseudo_id, name, birth_year, job, contact_phone, contact_email) VALUES
@@ -30,7 +31,7 @@ INSERT INTO introductions (member_id, counterpart_member_id) VALUES
   ('bbbbbbbb-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000003'),
   ('bbbbbbbb-0000-4000-8000-000000000003', 'bbbbbbbb-0000-4000-8000-000000000002');
 
--- 회원 1 이 member_b(회원 3)에게 프로필 공개 동의 (30일)
-INSERT INTO consents (member_id, counterpart_member_id, item, purpose, expires_at) VALUES
-  ('bbbbbbbb-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000003',
-   'profile', 'introduction', now() + interval '30 days');
+-- 회원 1 은 member_b(회원 3)에게 이미 매칭을 눌러 둔 상태 (회원 1 은 로그인 계정이 없음).
+-- member_b 가 회원 1 에게 매칭을 누르면 서로 프로필 제공 동의가 만들어진다.
+INSERT INTO matches (member_id, counterpart_member_id) VALUES
+  ('bbbbbbbb-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000003');

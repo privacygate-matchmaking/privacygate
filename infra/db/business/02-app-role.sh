@@ -6,6 +6,9 @@ CREATE ROLE app_user LOGIN PASSWORD :'app_pw';
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_user;
 GRANT SELECT ON users, members, assignments, introductions TO app_user;
+-- 회원 관리: 허용 항목 수정과 탈퇴(이름·연락처 삭제)만. 회원 행 삭제는 불가
+GRANT UPDATE (job, birth_year, name, contact_phone, contact_email, status, withdrawn_at) ON members TO app_user;
+GRANT SELECT, INSERT, UPDATE ON matches TO app_user;
 GRANT SELECT, INSERT, UPDATE ON member_exports TO app_user;
 -- 동의: 회원이 등록·철회 (삭제는 불가, 철회는 revoked_at 기록)
 GRANT SELECT, INSERT, UPDATE ON consents TO app_user;
