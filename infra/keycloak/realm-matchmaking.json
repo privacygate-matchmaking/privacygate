@@ -229,28 +229,6 @@
       ]
     },
     {
-      "id": "11111111-1111-4111-8111-111111111105",
-      "username": "super_admin",
-      "enabled": true,
-      "email": "super_admin@example.test",
-      "emailVerified": true,
-      "firstName": "총관리자",
-      "lastName": "",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "${KC_TEST_PASSWORD}",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "data_admin"
-      ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
-      ]
-    },
-    {
       "id": "11111111-1111-4111-8111-111111111102",
       "username": "data_admin",
       "enabled": true,

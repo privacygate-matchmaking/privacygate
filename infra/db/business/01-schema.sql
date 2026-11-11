@@ -5,8 +5,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- 사용자: user_id = Keycloak sub. 업무 역할은 토큰이 아니라 여기서 관리한다.
 CREATE TABLE users (
     user_id       uuid PRIMARY KEY,
-    pseudo_id     text UNIQUE NOT NULL            -- 코드: 직원 A-C01 (앞글자 A~Z + 역할 C/D/P/A + 2자리), 회원 계정은 회원 코드
-                  CHECK (pseudo_id ~ '^[A-Z]-([CDPA][0-9]{2}|[0-9]{3})$'),
+    pseudo_id     text UNIQUE NOT NULL            -- 코드: 직원 A-C01 (앞글자 A~Z + 역할 C/D/P + 2자리), 회원 계정은 회원 코드
+                  CHECK (pseudo_id ~ '^[A-Z]-([CDP][0-9]{2}|[0-9]{3})$'),
     display_name  text NOT NULL,
     role          text NOT NULL CHECK (role IN ('counselor', 'data_admin', 'approver', 'member')),
     active        boolean NOT NULL DEFAULT true,

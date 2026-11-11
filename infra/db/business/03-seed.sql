@@ -1,14 +1,13 @@
 -- 합성 시험 데이터 (실존 인물·기관 아님). user_id 는 infra/keycloak/realm-matchmaking.json 의 사용자 id 와 같다.
 --
 -- 코드 규칙 (관리자 화면·감사 로그 전용, 회원 화면에는 표시하지 않음)
---   직원: <A~Z>-<역할><2자리>  역할 C=상담, D=데이터 관리, P=승인, A=총관리자   예) A-C01, A-P01
+--   직원: <A~Z>-<역할><2자리>  역할 C=상담, D=총관리자(data_admin), P=승인   예) A-C01, A-D01, A-P01
 --   회원: <A~Z>-<3자리>        A-001 … A-999 다음 B-001 (DB 함수 next_member_code() 가 자동 발급)
 --   회원 로그인 계정(users)의 코드는 그 회원의 회원 코드와 같다.
 INSERT INTO users (user_id, pseudo_id, display_name, role) VALUES
   ('11111111-1111-4111-8111-111111111101', 'A-C01', 'counselor_a',  'counselor'),
   ('11111111-1111-4111-8111-111111111104', 'A-C02', 'counselor_b',  'counselor'),
   ('11111111-1111-4111-8111-111111111102', 'A-D01', 'data_admin',   'data_admin'),
-  ('11111111-1111-4111-8111-111111111105', 'A-A01', 'super_admin',  'data_admin'),
   ('11111111-1111-4111-8111-111111111103', 'A-P01', 'approver',     'approver'),
   ('22222222-2222-4222-8222-222222222201', 'A-003', 'member_b',     'member');
 

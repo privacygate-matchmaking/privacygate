@@ -35,12 +35,12 @@ docker compose up -d --build                     # 내부만 (keycloak, internal
 
 HTTPS 인증서는 `init-env.sh` 가 만든다. [mkcert](https://github.com/FiloSottile/mkcert) 가 설치돼 있으면(`mkcert -install` 한 번) 브라우저 경고가 없고, 없으면 자체 서명이라 처음 한 번 '계속 진행'이 필요하다.
 
-시험 계정 `super_admin`(총관리자), `counselor_a`, `counselor_b`, `data_admin`, `approver`, `member_b` — 비밀번호는 `.env` 의 `KC_TEST_PASSWORD`.
+시험 계정 `counselor_a`, `counselor_b`, `data_admin`(총관리자), `approver`, `member_b` — 비밀번호는 `.env` 의 `KC_TEST_PASSWORD`.
 
 합성 회원 추가: `./infra/scripts/add-member.sh 5` — 회원 코드는 자동 발급, 담당 상담 직원은 DB 트리거가 무작위로 배정한다 (A-001~A-003 은 시연용으로 counselor_a 고정).
 
 코드 규칙 (관리자 화면·감사 로그 전용, 회원 화면에는 표시하지 않음)
-- 직원: `<A~Z>-<역할><2자리>` — 역할 C=상담, D=데이터 관리, P=승인, A=총관리자 (예: `A-C01`, `A-P01`)
+- 직원: `<A~Z>-<역할><2자리>` — 역할 C=상담, D=총관리자(data_admin), P=승인 (예: `A-C01`, `A-D01`, `A-P01`)
 - 회원: `<A~Z>-<3자리>` — `A-001` … `A-999` 다음 `B-001` (DB 가 자동 발급)
 
 시험 데이터를 처음 상태로 되돌리기 (업무 DB·중계 DB·Keycloak·증빙 저장소 모두 초기화): `docker compose ... down -v` 후 다시 `up -d --build`
