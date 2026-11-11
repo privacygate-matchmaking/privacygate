@@ -1,5 +1,5 @@
 -- 회원 담당자 자동 배정: 새 회원이 등록되면 활성 상담 직원 중 한 명을 무작위로 담당자로 지정한다.
--- (시드의 A-001~A-003 → counselor_a 는 시연 시나리오를 위해 03-seed.sql 에서 고정 배정)
+-- (시드 회원 20명은 03-seed.sql 에서 상담 직원당 10명씩 고정 배정)
 CREATE OR REPLACE FUNCTION assign_random_counselor() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN

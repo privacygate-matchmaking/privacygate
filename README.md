@@ -37,7 +37,7 @@ HTTPS 인증서는 `init-env.sh` 가 만든다. [mkcert](https://github.com/Filo
 
 시험 계정 `counselor_a`, `counselor_b`, `data_admin`(총관리자), `approver`, `member_b` — 비밀번호는 `.env` 의 `KC_TEST_PASSWORD`.
 
-합성 회원 추가: `./infra/scripts/add-member.sh 5` — 회원 코드는 자동 발급, 담당 상담 직원은 DB 트리거가 무작위로 배정한다 (A-001~A-003 은 시연용으로 counselor_a 고정).
+합성 회원 추가: `./infra/scripts/add-member.sh 5` — 회원 코드는 자동 발급, 담당 상담 직원은 DB 트리거가 무작위로 배정한다 (시드 회원 20명은 counselor_a·counselor_b 에 10명씩 고정 배정).
 
 코드 규칙 (관리자 화면·감사 로그 전용, 회원 화면에는 표시하지 않음)
 - 직원: `<A~Z>-<역할><2자리>` — 역할 C=상담, D=총관리자(data_admin), P=승인 (예: `A-C01`, `A-D01`, `A-P01`)
