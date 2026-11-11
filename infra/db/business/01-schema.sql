@@ -37,6 +37,7 @@ CREATE TABLE assignments (
 -- 회원 동의: 상대 회원·항목·목적 단위, 만료·철회 가능
 CREATE TABLE consents (
     consent_id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    consent_no             bigserial UNIQUE,                   -- 화면 표시용 번호 (C-1, C-2 …)
     member_id              uuid NOT NULL REFERENCES members(member_id),
     counterpart_member_id  uuid NOT NULL REFERENCES members(member_id),
     item                   text NOT NULL CHECK (item IN ('profile', 'photo', 'contact')),
@@ -86,6 +87,20 @@ CREATE TABLE matches (
     cancelled_at           timestamptz,
     PRIMARY KEY (member_id, counterpart_member_id),
     CHECK (member_id <> counterpart_member_id)
+);
+
+-- 소개 자료 발송: 중계의 file_id·request_id·approval_id(UUID)를 화면용 이름(M-001_file1)과 잇는다
+CREATE TABLE intro_files (
+    label        text PRIMARY KEY,                             -- <회원 가명 ID>_file<순번>
+    member_id    uuid NOT NULL REFERENCES members(member_id),
+    seq          int  NOT NULL,
+    consent_id   uuid NOT NULL REFERENCES consents(consent_id),
+    file_id      uuid UNIQUE NOT NULL,                         -- 중계 transfer_files.file_id
+    request_id   uuid UNIQUE NOT NULL,                         -- 중계 export_requests.request_id
+    approval_id  uuid UNIQUE,                                  -- 승인 후 중계가 준 approval_id
+    created_by   uuid NOT NULL REFERENCES users(user_id),
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (member_id, seq)
 );
 
 -- 관리자 전체 회원 내보내기 결과: 파일은 evidence-storage/exports/ 에 암호문으로만 두고 브라우저로 내보내지 않는다
