@@ -157,6 +157,18 @@ class RoleFromClaims(unittest.TestCase):
         self.assertIsNone(role_from_claims({"realm_access": {"roles": ["approver", "data_admin"]}}))
 
 
+class TraceId(unittest.TestCase):
+    def test_valid_trace_id(self):
+        try:
+            from privacygate.web import valid_trace_id
+        except ImportError:
+            self.skipTest("fastapi 필요")
+        import uuid
+        self.assertTrue(valid_trace_id(uuid.uuid4().hex))
+        for bad in (None, "", "x" * 32, "ABC", uuid.uuid4().hex + "0", "../../etc/passwd"):
+            self.assertFalse(valid_trace_id(bad), bad)
+
+
 class GateMode(unittest.TestCase):
     def test_default_enforce(self):
         from privacygate import gate_mode
@@ -171,13 +183,14 @@ class GateMode(unittest.TestCase):
 
 
 class BaselineDelivery(unittest.TestCase):
-    """baseline 은 수신자만 확인 → 공격 ②(다른 file_id) 가 통과한다. enforce 는 막는다."""
+    """baseline 은 '요청 file_id ↔ 승인 파일' 연결만 생략 → 공격 ② 통과. 나머지 검사는 그대로."""
     def setUp(self):
         from datetime import datetime, timedelta, timezone
-        from privacygate.transfer_rules import ApprovedDelivery
+        from privacygate.transfer_rules import ApprovedDelivery, StoredFile
         self.now = datetime(2026, 11, 20, tzinfo=timezone.utc)
         self.d = ApprovedDelivery("d1", "member-b", "approved", self.now + timedelta(days=1),
                                   "file-ok", 1, "h", True)
+        self.stored = StoredFile("file-ok", 1, "h", "passed")
 
     def test_attack2_blocked_in_enforce(self):
         from privacygate.transfer_rules import delivery_problem
@@ -186,8 +199,18 @@ class BaselineDelivery(unittest.TestCase):
 
     def test_attack2_passes_in_baseline(self):
         from privacygate.transfer_rules import delivery_problem
-        self.assertIsNone(delivery_problem(self.d, None, requester_id="member-b", now=self.now,
+        self.assertIsNone(delivery_problem(self.d, self.stored, requester_id="member-b", now=self.now,
                                            requested_file_id="file-leak", baseline=True))
+
+    def test_baseline_keeps_other_checks(self):
+        from dataclasses import replace
+        from privacygate.transfer_rules import delivery_problem
+        expired = replace(self.d, expires_at=self.now)
+        self.assertEqual(delivery_problem(expired, self.stored, requester_id="member-b", now=self.now,
+                                          requested_file_id="file-leak", baseline=True)[1], "approval_expired")
+        no_consent = replace(self.d, consent_valid=False)
+        self.assertEqual(delivery_problem(no_consent, self.stored, requester_id="member-b", now=self.now,
+                                          baseline=True)[1], "consent_invalid")
 
     def test_baseline_still_checks_recipient(self):
         from privacygate.transfer_rules import delivery_problem

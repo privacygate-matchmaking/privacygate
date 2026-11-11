@@ -22,6 +22,13 @@ INSERT INTO assignments (user_id, member_id) VALUES
   ('11111111-1111-4111-8111-111111111101', 'bbbbbbbb-0000-4000-8000-000000000002'),
   ('11111111-1111-4111-8111-111111111101', 'bbbbbbbb-0000-4000-8000-000000000003');
 
+-- 소개 관계: member_b(회원 3)는 회원 1·2 와 서로 소개됨 (양방향으로 저장)
+INSERT INTO introductions (member_id, counterpart_member_id) VALUES
+  ('bbbbbbbb-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000003'),
+  ('bbbbbbbb-0000-4000-8000-000000000003', 'bbbbbbbb-0000-4000-8000-000000000001'),
+  ('bbbbbbbb-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000003'),
+  ('bbbbbbbb-0000-4000-8000-000000000003', 'bbbbbbbb-0000-4000-8000-000000000002');
+
 -- 회원 1 이 member_b(회원 3)에게 프로필 공개 동의 (30일)
 INSERT INTO consents (member_id, counterpart_member_id, item, purpose, expires_at) VALUES
   ('bbbbbbbb-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000003',

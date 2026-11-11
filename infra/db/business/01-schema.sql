@@ -67,6 +67,26 @@ CREATE TABLE evidence_reviews (
     created_at        timestamptz NOT NULL DEFAULT now()
 );
 
+-- 소개 관계: 서로 소개된 회원 쌍. 회원은 소개된 상대에게만 동의를 등록할 수 있다 (외부 화면의 counterparts)
+CREATE TABLE introductions (
+    member_id              uuid NOT NULL REFERENCES members(member_id),
+    counterpart_member_id  uuid NOT NULL REFERENCES members(member_id),
+    created_at             timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (member_id, counterpart_member_id),
+    CHECK (member_id <> counterpart_member_id)
+);
+
+-- 관리자 전체 회원 내보내기 결과: 파일은 evidence-storage/exports/ 에 암호문으로만 두고 브라우저로 내보내지 않는다
+CREATE TABLE member_exports (
+    export_id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_by        uuid NOT NULL REFERENCES users(user_id),
+    row_count         int  NOT NULL,
+    storage_key       text NOT NULL,
+    file_hash         text NOT NULL,                    -- sha256 hex
+    transfer_file_id  uuid,                             -- 중계 등록 시 받은 file_id
+    created_at        timestamptz NOT NULL DEFAULT now()
+);
+
 -- OIDC 로그인 진행 중 임시값 (한 번 쓰면 삭제)
 CREATE TABLE login_flows (
     state_hash     bytea PRIMARY KEY,

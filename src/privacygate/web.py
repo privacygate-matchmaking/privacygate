@@ -33,6 +33,14 @@ def trace_id(request: Request) -> str:
     return getattr(request.state, "trace_id", "-")
 
 
+_HEX = frozenset("0123456789abcdef")
+
+
+def valid_trace_id(value: str | None) -> bool:
+    """서비스 간 추적 ID 형식: 32자리 소문자 hex (uuid4().hex)."""
+    return bool(value) and len(value) == 32 and set(value) <= _HEX
+
+
 def route_action(request: Request) -> str:
     """실제 ID 대신 경로 템플릿을 남긴다 (예: GET /api/members/{member_id})."""
     route = request.scope.get("route")
@@ -54,6 +62,9 @@ def install(app: FastAPI, audit: AuditWriter) -> None:
     @app.middleware("http")
     async def _trace(request: Request, call_next):
         request.state.trace_id = uuid.uuid4().hex
+        # 들어온 추적 ID 는 후보로만 보관한다. 서비스 토큰 검증에 성공한 요청만 이어 쓴다 (service_guard).
+        incoming = request.headers.get(TRACE_HEADER, "").lower()
+        request.state.incoming_trace_id = incoming if valid_trace_id(incoming) else None
         response = await call_next(request)
         response.headers[TRACE_HEADER] = request.state.trace_id
         response.headers["Cache-Control"] = "no-store"
@@ -131,6 +142,9 @@ def service_guard(get_verifier: Callable[[], ServiceTokenVerifier], *allowed_cli
             raise GateError(ErrorCode.AUTH_REQUIRED, "service_token_missing")
         claims = get_verifier().verify(header[7:])
         request.state.service_client = claims.get("azp")
+        # 인증된 서비스가 보낸 추적 ID 를 이어 써서 외부 → 중계 → 내부 로그를 한 줄로 잇는다
+        if getattr(request.state, "incoming_trace_id", None):
+            request.state.trace_id = request.state.incoming_trace_id
         if claims.get("azp") not in allowed:
             raise GateError(ErrorCode.ACCESS_DENIED, "service_not_allowed")
         return claims

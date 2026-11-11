@@ -5,7 +5,8 @@ psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v app_pw="$APP_DB
 CREATE ROLE app_user LOGIN PASSWORD :'app_pw';
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO app_user;
-GRANT SELECT ON users, members, assignments TO app_user;
+GRANT SELECT ON users, members, assignments, introductions TO app_user;
+GRANT SELECT, INSERT, UPDATE ON member_exports TO app_user;
 -- 동의: 회원이 등록·철회 (삭제는 불가, 철회는 revoked_at 기록)
 GRANT SELECT, INSERT, UPDATE ON consents TO app_user;
 GRANT SELECT, INSERT, UPDATE ON evidence_files, evidence_reviews TO app_user;

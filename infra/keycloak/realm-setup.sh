@@ -13,7 +13,7 @@ $KC config credentials --server http://keycloak:8080 --realm master \
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null
 
 # 1) 한국어 기본 + internal-web 직원용 로그인 테마
-$KC update "realms/$REALM" -s internationalizationEnabled=true -s 'supportedLocales=["ko","en"]' -s defaultLocale=ko
+$KC update "realms/$REALM" -s 'displayName=이음 (가상 결혼정보회사)' -s internationalizationEnabled=true -s 'supportedLocales=["ko","en"]' -s defaultLocale=ko
 cid=$($KC get clients -r "$REALM" -q clientId=internal-web --fields id --format csv --noquotes)
 $KC update "clients/$cid" -r "$REALM" -s 'attributes."login_theme"=privacygate-staff'
 echo "한국어 기본, internal-web 로그인 테마: privacygate-staff"

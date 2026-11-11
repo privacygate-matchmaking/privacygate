@@ -1,6 +1,6 @@
 {
   "realm": "matchmaking",
-  "displayName": "PrivacyGate 결혼정보회사 (가상)",
+  "displayName": "이음 (가상 결혼정보회사)",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,

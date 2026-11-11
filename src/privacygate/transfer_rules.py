@@ -37,14 +37,13 @@ def delivery_problem(d: ApprovedDelivery, stored: StoredFile | None, *, requeste
                      baseline: bool = False) -> tuple[ErrorCode, str] | None:
     """제공할 수 없으면 (오류 코드, 감사용 사유), 제공 가능하면 None.
 
-    baseline=True (GATE_MODE=baseline, 시연 비교용): 수신자만 확인한다.
-    호출하는 쪽은 이때 요청의 file_id 를 그대로 제공하게 되며, 이것이 공격 ②가 노리는 취약 동작이다.
+    baseline=True (GATE_MODE=baseline, 시연 비교용): 수신자·승인 상태·만료·동의·승인 파일 무결성은 그대로 검사하고,
+    "요청 file_id 와 승인 파일의 연결" 검사만 생략한다. 호출하는 쪽은 이때 요청 file_id 의 파일을 제공하게 되며,
+    이것이 공격 ②가 노리는 취약 동작이다 (외부·중계 연동 계약 v0.5 와 같은 범위).
     """
     if requester_id != d.recipient_id:
         return ErrorCode.APPROVAL_MISMATCH, "recipient_mismatch"
-    if baseline:
-        return None
-    if requested_file_id is not None and requested_file_id != d.approved_file_id:
+    if not baseline and requested_file_id is not None and requested_file_id != d.approved_file_id:
         return ErrorCode.APPROVAL_MISMATCH, "requested_file_not_approved"
     if d.request_status in ("revoked", "rejected", "pending"):
         return ErrorCode.ACCESS_DENIED, f"request_{d.request_status}"

@@ -1,6 +1,6 @@
 # privacygate
 
-PrivacyGate 공통 보안 모듈(Python 패키지)과 전체 실행 환경.
+PrivacyGate 공통 보안 모듈(Python 패키지)과 전체 실행 환경 (가상 결혼정보회사 '이음').
 
 ```
 privacygate/
