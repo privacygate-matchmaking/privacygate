@@ -14,17 +14,27 @@ CREATE TABLE users (
 
 -- 회원 정보 (모두 합성 데이터)
 CREATE TABLE members (
-    member_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id        uuid UNIQUE REFERENCES users(user_id),   -- 외부 로그인 계정이 있는 회원만
-    pseudo_id      text UNIQUE NOT NULL,
-    name           text NOT NULL,
-    birth_year     int,
-    job            text,
-    contact_phone  text,
-    contact_email  text,
-    status         text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdrawn')),
-    withdrawn_at   timestamptz,                             -- 탈퇴 시 이름·연락처는 지우고 기록용 행만 남긴다
-    created_at     timestamptz NOT NULL DEFAULT now()
+    member_id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id              uuid UNIQUE REFERENCES users(user_id),   -- 외부 로그인 계정이 있는 회원만
+    pseudo_id            text UNIQUE NOT NULL,                     -- 회원 코드 (감사 로그·중계 연동용)
+    nickname             text UNIQUE NOT NULL,                     -- 닉네임(가명): 매칭 전 상대에게 보이는 이름
+    name                 text NOT NULL,                            -- 실명: 매칭·제공 후에만
+    birth_date           date,                                     -- 매칭 전에는 만 나이만 공개
+    height_cm            smallint CHECK (height_cm BETWEEN 120 AND 230),   -- 본인 신고
+    weight_kg            smallint CHECK (weight_kg BETWEEN 30 AND 200),    -- 본인 신고
+    education_level      text CHECK (education_level IN ('고졸', '전문대졸', '4년제 대졸', '대학원졸')),  -- 매칭 전 공개
+    school               text,                                     -- 학교 (매칭·제공 후, 졸업증명서로 확인)
+    major                text,
+    job_group            text,                                     -- 직군 (매칭 전 공개)
+    company              text,                                     -- 직장 (재직 증빙 통과 시에만 제공)
+    introduction         text,
+    education_verified   boolean NOT NULL DEFAULT false,           -- 학력 증빙 통과 (매칭 필수 조건)
+    employment_verified  boolean NOT NULL DEFAULT false,           -- 재직 증빙 통과 (직장 공개 조건)
+    contact_phone        text,
+    contact_email        text,
+    status               text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'withdrawn')),
+    withdrawn_at         timestamptz,                              -- 탈퇴 시 이름·연락처는 지우고 기록용 행만 남긴다
+    created_at           timestamptz NOT NULL DEFAULT now()
 );
 
 -- 담당 관계: counselor 가 조회할 수 있는 회원
@@ -52,6 +62,7 @@ CREATE TABLE evidence_files (
     file_id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     member_id         uuid NOT NULL REFERENCES members(member_id),
     submitted_by      uuid NOT NULL REFERENCES users(user_id),
+    kind              text NOT NULL DEFAULT 'education' CHECK (kind IN ('education', 'employment')),  -- 학력 / 재직
     reviewer_user_id  uuid REFERENCES users(user_id),       -- 배정된 data_admin
     storage_key       text,                                  -- 삭제 후 NULL
     key_id            text NOT NULL,
