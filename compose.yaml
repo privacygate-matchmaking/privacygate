@@ -52,14 +52,13 @@ services:
       retries: 30
       start_period: 30s
 
-  # realm 설정 적용: 한국어·직원 로그인 테마, 직원 OTP 강제 여부(.env REQUIRE_STAFF_OTP, 기본 true). 실행 후 종료
+  # realm 설정 적용: 한국어·직원 로그인 테마, 직원 계정 보충, 토큰 암호화 키 끄기. 실행 후 종료
   keycloak-setup:
     image: quay.io/keycloak/keycloak:26.0.7
     entrypoint: ["/bin/bash", "/opt/setup/realm-setup.sh"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-infra_admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
-      REQUIRE_STAFF_OTP: ${REQUIRE_STAFF_OTP:-true}
       KC_TEST_PASSWORD: ${KC_TEST_PASSWORD:?}
     volumes:
       - ./infra/keycloak/realm-setup.sh:/opt/setup/realm-setup.sh:ro

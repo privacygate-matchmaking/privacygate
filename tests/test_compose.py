@@ -71,7 +71,6 @@ class Https(unittest.TestCase):
         for key in ("KC_PUBLIC_URL", "INTERNAL_BASE_URL", "EXTERNAL_BASE_URL"):
             self.assertRegex(env, rf"(?m)^{key}=https://")
         self.assertRegex(env, r"(?m)^COOKIE_SECURE=true$")
-        self.assertRegex(env, r"(?m)^REQUIRE_STAFF_OTP=true$")   # 기본값은 OTP 켜짐
         self.assertRegex(env, r"(?m)^GATE_MODE=enforce$")         # 기본값은 통제 켜짐
 
 

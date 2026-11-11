@@ -49,9 +49,9 @@ body.login-pf::before {
   content: "STAFF SIGN-IN"; display: block; margin-bottom: 8px;
   font-size: 10px; letter-spacing: 2.2px; font-weight: 700; color: var(--pg-blue);
 }
-/* 로그인 화면에서만 (OTP 등록·오류 화면에는 붙이지 않음) */
+/* 로그인 화면에서만 (오류 화면 등에는 붙이지 않음) */
 .card-pf:has(#kc-form-login) #kc-page-title::after {
-  content: "직원 계정과 OTP(TOTP)로 로그인합니다."; display: block; margin-top: 6px;
+  content: "직원 아이디와 비밀번호로 로그인합니다."; display: block; margin-top: 6px;
   font-size: 13px; font-weight: 400; letter-spacing: 0; color: var(--pg-muted);
 }
 

@@ -2,9 +2,7 @@
 # keycloak-setup 서비스가 시작할 때 한 번 실행한다. (realm 파일은 처음 한 번만 불러오므로 이미 만든 realm 에도 적용)
 #  0) 나중에 추가된 직원 계정 보충 (counselor_b)
 #  1) 한국어 기본, 직원용 로그인 테마(internal-web 만), 토큰 암호화 키 끄기
-#  2) 직원 OTP(TOTP) 강제 여부를 .env 의 REQUIRE_STAFF_OTP 에 맞춘다
-#   true  (기본, 시연·평가): OTP 미등록 직원에게 첫 로그인 시 OTP 등록 강제
-#   false (개발 중에만): 직원의 OTP 등록 요구와 등록된 OTP 를 지워 ID·비밀번호만으로 로그인
+#  2) OTP 는 쓰지 않는다: 이전 설정으로 남은 직원의 OTP 등록 요구·등록된 OTP 를 지운다 (ID·비밀번호 로그인)
 set -euo pipefail
 KC=/opt/keycloak/bin/kcadm.sh
 REALM=matchmaking
@@ -22,7 +20,7 @@ add_user() {
 {"ifResourceExists":"SKIP","users":[{"id":"$uid","username":"$uname","enabled":true,
  "email":"$uname@example.test","emailVerified":true,"firstName":"$first","lastName":"$last",
  "credentials":[{"type":"password","value":"${KC_TEST_PASSWORD:?}","temporary":false}],
- "realmRoles":["$role"],"requiredActions":["CONFIGURE_TOTP"]}]}
+ "realmRoles":["$role"]}]}
 JSON
   $KC create partialImport -r "$REALM" -f /tmp/add-user.json >/dev/null
   rm -f /tmp/add-user.json
@@ -46,21 +44,14 @@ for kid in $enc_ids; do
 done
 echo "토큰 암호화 키(RSA-OAEP) 끔: JWKS 에는 서명 키만 공개"
 
-# 2) 직원 OTP
+# 2) OTP 사용 안 함: 남아 있는 OTP 등록 요구·OTP 자격증명 정리
 for u in $STAFF; do
   id=$($KC get users -r "$REALM" -q username="$u" -q exact=true --fields id --format csv --noquotes)
   [ -n "$id" ] || { echo "사용자 없음: $u"; continue; }
   # keycloak 이미지에는 awk 가 없어 bash 로 OTP 자격증명 id 만 고른다
   otp_ids=$($KC get "users/$id/credentials" -r "$REALM" --fields id,type --format csv --noquotes \
     | while IFS=, read -r cid ctype; do if [ "$ctype" = "otp" ]; then echo "$cid"; fi; done)
-  if [ "${REQUIRE_STAFF_OTP:-true}" = "false" ]; then
-    $KC update "users/$id" -r "$REALM" -s 'requiredActions=[]'
-    for c in $otp_ids; do $KC delete "users/$id/credentials/$c" -r "$REALM"; done
-    echo "[개발 모드] $u: OTP 끔"
-  elif [ -z "$otp_ids" ]; then
-    $KC update "users/$id" -r "$REALM" -s 'requiredActions=["CONFIGURE_TOTP"]'
-    echo "$u: 첫 로그인 시 OTP 등록 필요"
-  else
-    echo "$u: OTP 등록됨"
-  fi
+  $KC update "users/$id" -r "$REALM" -s 'requiredActions=[]'
+  for c in $otp_ids; do $KC delete "users/$id/credentials/$c" -r "$REALM"; done
 done
+echo "직원 로그인: ID·비밀번호 (OTP 사용 안 함)"

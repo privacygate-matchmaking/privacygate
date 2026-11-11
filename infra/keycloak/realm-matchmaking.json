@@ -201,9 +201,6 @@
       ],
       "realmRoles": [
         "counselor"
-      ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
       ]
     },
     {
@@ -223,9 +220,6 @@
       ],
       "realmRoles": [
         "counselor"
-      ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
       ]
     },
     {
@@ -245,9 +239,6 @@
       ],
       "realmRoles": [
         "data_admin"
-      ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
       ]
     },
     {
@@ -267,9 +258,6 @@
       ],
       "realmRoles": [
         "approver"
-      ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
       ]
     },
     {
