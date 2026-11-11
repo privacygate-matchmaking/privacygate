@@ -3,13 +3,20 @@
 CREATE OR REPLACE FUNCTION assign_random_counselor() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-    INSERT INTO assignments (user_id, member_id)
-    SELECT u.user_id, NEW.member_id
-      FROM users u
-     WHERE u.role = 'counselor' AND u.active
-     ORDER BY random()
-     LIMIT 1
-    ON CONFLICT DO NOTHING;
+    WITH picked AS (
+        INSERT INTO assignments (user_id, member_id)
+        SELECT u.user_id, NEW.member_id
+          FROM users u
+         WHERE u.role = 'counselor' AND u.active
+         ORDER BY random()
+         LIMIT 1
+        ON CONFLICT DO NOTHING
+        RETURNING user_id
+    )
+    -- 배정된 상담 직원에게 알림
+    INSERT INTO notifications (user_id, kind, title, body, link_view)
+    SELECT user_id, 'member_assigned', '새 담당 회원 배정', NEW.pseudo_id || ' ' || NEW.name || ' 회원이 배정되었습니다.', 'members'
+      FROM picked;
     RETURN NEW;
 END $$;
 

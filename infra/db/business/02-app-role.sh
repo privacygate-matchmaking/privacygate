@@ -12,6 +12,8 @@ GRANT UPDATE (gender, birth_date, height_cm, weight_kg, education_level, school,
               status, withdraw_requested_at, withdraw_at, withdraw_requested_by, withdraw_reason) ON members TO app_user;
 -- 탈퇴 확정 삭제는 함수로만 (테이블 DELETE 권한 없음)
 GRANT EXECUTE ON FUNCTION purge_member(uuid) TO app_user;
+-- 직원 알림: 만들기·읽음·삭제 (본인 것만 다루는지는 internal-api 가 확인)
+GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO app_user;
 GRANT SELECT, INSERT, UPDATE ON matches TO app_user;
 GRANT SELECT, INSERT, UPDATE ON member_exports TO app_user;
 -- 동의: 회원이 등록·철회 (삭제는 불가, 철회는 revoked_at 기록)

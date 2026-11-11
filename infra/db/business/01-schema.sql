@@ -141,6 +141,19 @@ CREATE TABLE member_exports (
     created_at        timestamptz NOT NULL DEFAULT now()
 );
 
+-- 직원 알림 (화면 오른쪽 위 종 아이콘). 본인 알림만 읽기·읽음 처리·삭제
+CREATE TABLE notifications (
+    notification_id  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          uuid NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    kind             text NOT NULL,                  -- evidence_submitted, match_made, intro_requested … (화면 아이콘·분류용)
+    title            text NOT NULL,
+    body             text,
+    link_view        text,                           -- 누르면 이동할 화면 (members / manage / evidence / approvals)
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    read_at          timestamptz
+);
+CREATE INDEX notifications_user_idx ON notifications (user_id, created_at DESC);
+
 -- OIDC 로그인 진행 중 임시값 (한 번 쓰면 삭제)
 CREATE TABLE login_flows (
     state_hash     bytea PRIMARY KEY,
