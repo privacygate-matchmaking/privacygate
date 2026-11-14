@@ -11,9 +11,7 @@ GRANT UPDATE (gender, birth_date, height_cm, weight_kg, education_level, school,
               education_verified, employment_verified, name, contact_phone, contact_email,
               status, withdraw_requested_at, withdraw_at, withdraw_requested_by, withdraw_reason) ON members TO app_user;
 -- 탈퇴 확정 삭제는 함수로만 (테이블 DELETE 권한 없음)
-GRANT EXECUTE ON FUNCTION purge_member(uuid, int) TO app_user;
--- 탈퇴 안내: 조회와 (Keycloak 계정 삭제 후) 행 삭제만. 기록은 purge_member 함수만 만든다
-GRANT SELECT, DELETE ON withdrawal_notices TO app_user;
+GRANT EXECUTE ON FUNCTION purge_member(uuid) TO app_user;
 -- 직원 알림: 만들기·읽음·삭제 (본인 것만 다루는지는 internal-api 가 확인)
 GRANT SELECT, INSERT, UPDATE, DELETE ON notifications TO app_user;
 GRANT SELECT, INSERT, UPDATE ON matches TO app_user;
