@@ -191,14 +191,27 @@ CREATE TABLE audit_log (
     reason       text
 );
 
+-- 탈퇴 안내: 회원 행이 지워진 뒤에도 로그인한 본인에게 "탈퇴된 계정"과 (직원 처리 시) 사유를 보여 주기 위한 최소 기록.
+-- user_id 는 Keycloak 계정 id (users 행은 이미 삭제되므로 FK 없음). 이름·회원 코드는 남기지 않는다.
+-- account_delete_after 가 지나면 internal-api 주기 작업이 Keycloak 계정을 지우고 이 행도 지운다.
+CREATE TABLE withdrawal_notices (
+    user_id               uuid PRIMARY KEY,
+    by_staff              boolean NOT NULL,
+    reason                text CHECK (char_length(reason) <= 200),
+    withdrawn_at          timestamptz NOT NULL DEFAULT now(),
+    account_delete_after  timestamptz NOT NULL
+);
+
 -- 회원 삭제(탈퇴 확정): 회원과 관련 행(동의·매칭·소개 관계·담당·증빙·소개 자료 기록·회원 로그인 계정 행)을 모두 지운다.
 -- 앱 계정(app_user)에는 각 테이블 DELETE 권한을 주지 않고 이 함수 실행 권한만 준다 (삭제 범위를 함수로 고정).
 -- 반환: 지워야 할 증빙 암호문 파일의 storage_key 목록 (파일 삭제는 internal-api 가 한다). 감사 로그는 남긴다.
-CREATE FUNCTION purge_member(p_member uuid) RETURNS TABLE (storage_key text)
+-- 회원 로그인 계정이 있으면 탈퇴 안내 기록(withdrawal_notices)을 p_notice_days 일 동안 남긴다.
+CREATE FUNCTION purge_member(p_member uuid, p_notice_days int DEFAULT 30) RETURNS TABLE (storage_key text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_user uuid;
+DECLARE v_user uuid; v_by uuid; v_reason text;
 BEGIN
-    SELECT m.user_id INTO v_user FROM members m WHERE m.member_id = p_member FOR UPDATE;
+    SELECT m.user_id, m.withdraw_requested_by, m.withdraw_reason INTO v_user, v_by, v_reason
+      FROM members m WHERE m.member_id = p_member FOR UPDATE;
     IF NOT FOUND THEN
         RETURN;
     END IF;
@@ -218,6 +231,13 @@ BEGIN
     IF v_user IS NOT NULL THEN
         DELETE FROM sessions s WHERE s.user_id = v_user;
         DELETE FROM users u WHERE u.user_id = v_user AND u.role = 'member';
+        -- 본인이 요청한 탈퇴면 by_staff = false (요청자 기록이 없으면 직원 처리로 본다)
+        INSERT INTO withdrawal_notices (user_id, by_staff, reason, account_delete_after)
+        VALUES (v_user, v_by IS DISTINCT FROM v_user,
+                CASE WHEN v_by IS DISTINCT FROM v_user THEN v_reason END,
+                now() + make_interval(days => GREATEST(p_notice_days, 0)))
+        ON CONFLICT (user_id) DO UPDATE SET by_staff = EXCLUDED.by_staff, reason = EXCLUDED.reason,
+               withdrawn_at = EXCLUDED.withdrawn_at, account_delete_after = EXCLUDED.account_delete_after;
     END IF;
 END $$;
-REVOKE ALL ON FUNCTION purge_member(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION purge_member(uuid, int) FROM PUBLIC;
