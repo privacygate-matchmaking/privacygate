@@ -13,3 +13,6 @@ infra/secrets/*
 *.key
 *.pem
 *.log
+
+# 합성 시험 증빙 (make-sample-evidence.sh 출력)
+samples/

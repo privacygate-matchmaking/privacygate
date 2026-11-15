@@ -78,11 +78,16 @@ CREATE TABLE evidence_files (
     file_id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     member_id         uuid NOT NULL REFERENCES members(member_id),
     submitted_by      uuid NOT NULL REFERENCES users(user_id),
-    kind              text NOT NULL DEFAULT 'education' CHECK (kind IN ('education', 'employment')),  -- 학력 / 재직
+    -- 학력 / 재직 / 신분증 / 혼인관계 / 소득 / 부동산 / 프로필 사진
+    kind              text NOT NULL DEFAULT 'education'
+                      CHECK (kind IN ('education', 'employment', 'identity', 'marital', 'income', 'property', 'photo')),
     reviewer_user_id  uuid REFERENCES users(user_id),       -- 배정된 data_admin
     storage_key       text,                                  -- 삭제 후 NULL
     key_id            text NOT NULL,
     file_hash         text NOT NULL,                         -- sha256 hex
+    -- 직원 화면용 파일 이름: 회원이 올린 이름은 쓰지 않고 서버가 "A-003(박도윤)_education.pdf" 형식으로 정한다
+    -- (저장 경로는 여전히 UUID. 이름에 실명이 들어가므로 직원 화면·응답 헤더에만 쓰고 외부로 보내지 않는다)
+    file_name         text CHECK (char_length(file_name) <= 120),
     status            text NOT NULL CHECK (status IN ('submitted', 'in_review', 'reviewed', 'deleted')),
     delete_after      timestamptz NOT NULL,
     legal_hold        boolean NOT NULL DEFAULT false,
@@ -96,6 +101,75 @@ CREATE TABLE evidence_reviews (
     criteria_date     date NOT NULL,
     created_at        timestamptz NOT NULL DEFAULT now()
 );
+
+-- 증빙 자동 검사 결과 (doc-inspector: 로컬 OCR·규칙 탐지·마스킹). 원본 보존 기간이 끝나면 함께 지운다.
+-- 추출 값(성명·생년월일·발급번호·금액 등)은 DB 에 두지 않고 암호화 파일(fields_key)로만 둔다.
+CREATE TABLE evidence_inspections (
+    file_id         uuid PRIMARY KEY REFERENCES evidence_files(file_id),
+    status          text NOT NULL CHECK (status IN ('done', 'failed')),
+    verdict         text NOT NULL CHECK (verdict IN ('verified', 'suspicious', 'unchecked')),  -- 발급대장 대조 결과
+    checks          jsonb NOT NULL DEFAULT '{}',     -- 형식·검증숫자·대장 일치·성명/생년월일 일치 (참/거짓만)
+    detected        jsonb NOT NULL DEFAULT '{}',     -- 개인정보 종류별 건수 (값 없음)
+    proposed        jsonb NOT NULL DEFAULT '{}',     -- 공개 사실 제안 (구간·여부만)
+    summary         text CHECK (char_length(summary) <= 300),
+    fields_key      text,                            -- 직원 확인용 추출 값 (암호문)
+    masked_key      text,                            -- 마스킹 사본 (암호문)
+    masked_hash     text,
+    masked_type     text CHECK (masked_type IN ('image/png', 'image/jpeg')),
+    error           text CHECK (char_length(error) <= 200),
+    version         text NOT NULL,
+    inspected_at    timestamptz NOT NULL DEFAULT now()
+);
+
+-- 심사 통과 후 공개 가능한 결과: 한 줄 요약(구간·여부만)과 마스킹 사본. 원본 삭제 뒤에도 회원 정보 삭제 전까지 유지.
+-- 신분증(identity)은 본인 확인용으로만 쓰고 사본을 남기지 않는다 (다른 회원에게 절대 제공하지 않음).
+CREATE TABLE evidence_results (
+    file_id         uuid PRIMARY KEY REFERENCES evidence_files(file_id),
+    member_id       uuid NOT NULL REFERENCES members(member_id),
+    kind            text NOT NULL,
+    facts           jsonb NOT NULL DEFAULT '{}',
+    summary         text NOT NULL CHECK (char_length(summary) <= 300),
+    masked_key      text,
+    masked_hash     text,
+    masked_type     text CHECK (masked_type IN ('image/png', 'image/jpeg')),
+    reviewed_by     uuid NOT NULL REFERENCES users(user_id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    CHECK (kind <> 'identity' OR masked_key IS NULL)
+);
+CREATE INDEX evidence_results_member_idx ON evidence_results (member_id, kind, created_at DESC);
+
+-- 합성 발급대장: 진위 판단 시험용 (실제 기관 연동 아님). 발급번호 = 연도-일련번호-검증숫자(Luhn)
+CREATE TABLE doc_registry (
+    issue_no        text PRIMARY KEY CHECK (issue_no ~ '^20[0-9]{2}-[0-9]{6}-[0-9]$'),
+    kind            text NOT NULL CHECK (kind IN ('identity', 'marital', 'income', 'property', 'education', 'employment')),
+    holder_name     text NOT NULL,
+    holder_birth    date,
+    revoked         boolean NOT NULL DEFAULT false,
+    issued_at       date NOT NULL DEFAULT current_date
+);
+
+CREATE FUNCTION ieum_issue_no(p_year int, p_serial int) RETURNS text
+LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE body text := lpad(p_year::text, 4, '0') || lpad(p_serial::text, 6, '0'); total int := 0; n int; i int;
+BEGIN
+    FOR i IN 0 .. length(body) - 1 LOOP
+        n := substr(body, length(body) - i, 1)::int * CASE WHEN i % 2 = 0 THEN 2 ELSE 1 END;
+        total := total + CASE WHEN n > 9 THEN n - 9 ELSE n END;
+    END LOOP;
+    RETURN lpad(p_year::text, 4, '0') || '-' || lpad(p_serial::text, 6, '0') || '-' || ((10 - total % 10) % 10)::text;
+END $$;
+
+-- 회원 코드(A-003)와 문서 종류로 합성 발급번호를 정한다 (doc-inspector 의 시험 문서 생성기와 같은 규칙)
+CREATE FUNCTION register_member_documents(p_member uuid) RETURNS void
+LANGUAGE sql AS $$
+    INSERT INTO doc_registry (issue_no, kind, holder_name, holder_birth)
+    SELECT ieum_issue_no(2026, (ascii(substr(m.pseudo_id, 1, 1)) - 65) * 10000 + substr(m.pseudo_id, 3)::int * 10 + k.idx),
+           k.kind, m.name, m.birth_date
+      FROM members m,
+           (VALUES (1, 'identity'), (2, 'marital'), (3, 'income'), (4, 'property'), (5, 'education'), (6, 'employment')) AS k(idx, kind)
+     WHERE m.member_id = p_member
+    ON CONFLICT (issue_no) DO NOTHING;
+$$;
 
 -- 소개 관계: 서로 소개된 회원 쌍. 회원은 소개된 상대에게만 동의를 등록할 수 있다 (외부 화면의 counterparts)
 CREATE TABLE introductions (
@@ -216,7 +290,17 @@ BEGIN
         RETURN;
     END IF;
     RETURN QUERY SELECT e.storage_key FROM evidence_files e
-                  WHERE (e.member_id = p_member OR e.submitted_by = v_user) AND e.storage_key IS NOT NULL;
+                  WHERE (e.member_id = p_member OR e.submitted_by = v_user) AND e.storage_key IS NOT NULL
+                 UNION ALL
+                 SELECT k FROM evidence_inspections i JOIN evidence_files e ON e.file_id = i.file_id,
+                        LATERAL (VALUES (i.fields_key), (i.masked_key)) AS x(k)
+                  WHERE (e.member_id = p_member OR e.submitted_by = v_user) AND k IS NOT NULL
+                 UNION ALL
+                 SELECT r.masked_key FROM evidence_results r WHERE r.member_id = p_member AND r.masked_key IS NOT NULL;
+    DELETE FROM evidence_results r WHERE r.member_id = p_member
+        OR r.file_id IN (SELECT e.file_id FROM evidence_files e WHERE e.submitted_by = v_user);
+    DELETE FROM evidence_inspections i USING evidence_files e
+     WHERE i.file_id = e.file_id AND (e.member_id = p_member OR e.submitted_by = v_user);
     DELETE FROM evidence_reviews r USING evidence_files e
      WHERE r.file_id = e.file_id AND (e.member_id = p_member OR e.submitted_by = v_user);
     DELETE FROM evidence_files e WHERE e.member_id = p_member OR e.submitted_by = v_user;

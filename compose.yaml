@@ -101,14 +101,28 @@ services:
       KC_ADMIN_CLIENT_ID: internal-admin
       KC_ADMIN_CLIENT_SECRET: ${INTERNAL_ADMIN_CLIENT_SECRET:?}
       MEMBER_NOTICE_DAYS: ${MEMBER_NOTICE_DAYS:-30}   # 탈퇴 안내 기간(일). 지나면 Keycloak 계정 삭제. 0 이면 바로 삭제
+      INSPECTOR_URL: http://doc-inspector:8000
     volumes:
       - audit-logs:/var/log/matchmaking
       - evidence-storage:/data/evidence-storage
     secrets: [evidence_master_key]
-    networks: [internal-web-net, business-net, transfer-net, auth-internal-net]
+    networks: [internal-web-net, business-net, transfer-net, auth-internal-net, inspect-net]
     depends_on:
       business-db: { condition: service_healthy }
       keycloak: { condition: service_healthy }
+      doc-inspector: { condition: service_started }
+
+  # 증빙 자동 검사: 로컬 OCR(Tesseract)·규칙 탐지·진위(형식) 검사·마스킹 사본 생성
+  # 문서 파서는 공격 표면이 크므로 따로 격리: internal-api 와만 연결, 인터넷·DB·키·저장소 없음, 읽기 전용
+  doc-inspector:
+    build: ../matchmaking-internal/doc-inspector
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    pids_limit: 64
+    networks: [inspect-net]
 
   business-db:
     image: postgres:16-alpine
@@ -217,6 +231,7 @@ networks:
   transfer-db-net:   { internal: true }   # transfer-api ↔ transfer-db
   auth-internal-net: { internal: true }   # keycloak ↔ internal-api, transfer-api
   auth-external-net: { internal: true }   # keycloak ↔ external-api
+  inspect-net:       { internal: true }   # internal-api ↔ doc-inspector (증빙 자동 검사)
 
 volumes:
   keycloak-data:

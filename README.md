@@ -47,6 +47,11 @@ HTTPS 인증서는 `init-env.sh` 가 만든다. [mkcert](https://github.com/Filo
 `MEMBER_NOTICE_DAYS`(기본 30일) 동안은 로그인하면 "탈퇴된 계정" 안내만 보이며, 그 뒤 Keycloak 계정도 지운다
 (전용 client `internal-admin`, `.env` 의 `INTERNAL_ADMIN_CLIENT_SECRET`).
 
+증빙 자동 검사: `doc-inspector` 컨테이너(로컬 Tesseract OCR·규칙 탐지·마스킹, internal-api 하고만 연결)가 제출된 서류를 검사합니다.
+시험용 합성 서류 6종(신분증·혼인관계·소득·부동산·학력·재직) + 프로필 사진 만들기:
+`./infra/scripts/make-sample-evidence.sh A-003` → `./samples/` (Git 제외). 외부 화면 "증빙 관리"에서 종류를 골라 제출합니다.
+자동 검사 시험: `docker compose exec -T doc-inspector python - < ../matchmaking-internal/tests/test_doc_inspector.py`
+
 권한 동작 시험 (내부 스택 실행 중, 시드 데이터 상태):
 `docker compose exec -T internal-api python - < ../matchmaking-internal/tests/test_permissions.py`
 

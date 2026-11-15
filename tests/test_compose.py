@@ -48,6 +48,17 @@ class ComposeIsolation(unittest.TestCase):
             if svc.get("ports"):
                 self.assertTrue(self.nets[name] & PUBLIC, name)
 
+    def test_doc_inspector_isolated(self):
+        """문서 파서는 internal-api 하고만 연결, 저장소·비밀값 없음, 읽기 전용."""
+        svc = self.doc["services"]["doc-inspector"]
+        self.assertEqual(self.nets["doc-inspector"], {"inspect-net"})
+        for name in self.nets:
+            if name not in ("doc-inspector", "internal-api"):
+                self.assertFalse(self.shared("doc-inspector", name), name)
+        self.assertFalse(svc.get("volumes") or svc.get("secrets") or svc.get("ports"))
+        self.assertTrue(svc.get("read_only"))
+        self.assertIn("ALL", svc.get("cap_drop", []))
+
     def test_storage_mounted_by_owner_only(self):
         owners = {"evidence-storage": "internal-api", "transfer-staging": "transfer-api",
                   "transfer-verified": "transfer-api"}

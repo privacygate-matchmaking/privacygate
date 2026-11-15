@@ -23,6 +23,10 @@ GRANT SELECT, INSERT, UPDATE ON consents TO app_user;
 GRANT USAGE ON SEQUENCE consents_consent_no_seq TO app_user;
 GRANT SELECT, INSERT, UPDATE ON intro_files TO app_user;
 GRANT SELECT, INSERT, UPDATE ON evidence_files, evidence_reviews TO app_user;
+-- 증빙 자동 검사·심사 결과 (검사 결과는 원본 삭제 때 함께 지운다), 합성 발급대장은 조회만
+GRANT SELECT, INSERT, UPDATE, DELETE ON evidence_inspections TO app_user;
+GRANT SELECT, INSERT ON evidence_results TO app_user;
+GRANT SELECT ON doc_registry TO app_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON login_flows, sessions TO app_user;
 -- 감사 기록은 추가만 (수정·삭제 불가)
 GRANT INSERT ON audit_log TO app_user;
