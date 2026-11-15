@@ -16,3 +16,6 @@ infra/secrets/*
 
 # 합성 시험 증빙 (make-sample-evidence.sh 출력)
 samples/
+
+# 최종 비교 시연 증거 (compare/collect-evidence.sh 출력, 합성 데이터지만 외부 공유 금지)
+evidence/

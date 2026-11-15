@@ -85,3 +85,7 @@ python -m unittest discover -s tests -v   # 실행 환경 시험은 PyYAML 필�
 - 감사 로그에는 정해진 필드만 들어간다. 이름·연락처·파일 내용·비밀번호·세션 값은 넣을 수 없다.
 - 이 레포를 고치면 내부·외부 담당 모두 PR 리뷰한다.
 - `.env`, `infra/secrets/` 는 절대 커밋하지 않는다. 커밋 전 `git status` 확인.
+
+## 최종 보안 비교 시연
+
+`infra/scripts/compare/` — baseline·enforce 에 같은 요청(공격 ①②)을 보내고 응답·실제 파일·감사 로그·Wazuh 경보를 `evidence/` 에 모아 비교 보고서를 만든다. 절차는 [compare/README.md](infra/scripts/compare/README.md).
