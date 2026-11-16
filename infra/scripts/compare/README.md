@@ -20,6 +20,12 @@ baseline은 공격 ①②가 노리는 통제 2개만 끈다. 로그인·세션�
 
 `evidence/`는 Git 제외다. 합성 데이터라도 외부에 올리지 않는다.
 
+## 두 PC 시연 (Tailscale Funnel)
+
+서버는 컴퓨터 1(Mac) 한 대, 공격 ①은 Mac(또는 tailnet 직원 PC)의 counselor_a 탭, 공격 ②는 **외부 PC(Windows, Tailscale 없음)** 브라우저에서 Funnel 공개 주소(`https://<이름>.<tailnet>.ts.net`)로 로그인한 member_001 탭에서 실행한다. 설정은 `../../funnel/README.md`. `.env` 에 `KC_ADMIN_URL` 이 있으면 아래 스크립트들이 `compose.funnel.yaml` 을 자동으로 함께 쓴다.
+
+시연 전에 외부 PC 에서 `check-exposure.ps1` 로 네트워크 분리 증거(`exposure-<시각>.csv`)를 남기고 `evidence/` 로 옮긴다. 공격 ②의 Console 코드는 그대로 쓰되, 외부 PC 브라우저의 회원 탭에서 실행한다.
+
 ## 0. Wazuh 켜기 (Mac, 처음 한 번)
 
 matchmaking-external 폴더에서 실행한다. Docker Desktop 설정에서 메모리 8GB 이상, CPU 4개 이상을 배정해야 한다. 최초 설치는 Docker 디스크 여유 50GiB가 필요하다.

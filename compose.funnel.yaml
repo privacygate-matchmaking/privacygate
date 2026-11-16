@@ -1,0 +1,19 @@
+# Tailscale Funnel 배포용 덧붙임 파일 (infra/funnel/README.md 참고)
+#   - auth-gateway: 인터넷(Funnel 8443)에 Keycloak 의 회원 로그인 경로만 공개하는 문지기.
+#     /realms/matchmaking/* 와 /resources/* 만 통과, /admin·master realm·계정 콘솔은 404.
+#   - Keycloak 관리자 화면은 tailnet 전용 주소(KC_ADMIN_URL)로만 쓴다.
+# 사용: composeArgs 에 -f ../privacygate/compose.funnel.yaml 을 추가
+services:
+  keycloak:
+    environment:
+      KC_HOSTNAME_ADMIN: ${KC_ADMIN_URL:?KC_ADMIN_URL 을 .env 에 넣으세요 (예 https://ieum.<tailnet>.ts.net:8081)}
+
+  auth-gateway:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    volumes:
+      - ./infra/funnel/auth-gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    ports: ["127.0.0.1:8088:8088"]          # Funnel 8443 → 여기 (호스트 밖에는 열지 않음)
+    networks: [public-auth]
+    depends_on:
+      keycloak: { condition: service_healthy }
+    restart: unless-stopped

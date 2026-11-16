@@ -35,13 +35,18 @@ $KC update "realms/$REALM" -s 'displayName=이음 (가상 결혼정보회사)' -
 cid=$($KC get clients -r "$REALM" -q clientId=internal-web --fields id --format csv --noquotes)
 $KC update "clients/$cid" -r "$REALM" -s 'attributes."login_theme"=privacygate-staff'
 echo "한국어 기본, internal-web 로그인 테마: privacygate-staff"
-# 1-0) 로그인 화면 로고를 누르면 앱 첫 화면으로 (테마 template.ftl 이 client baseUrl 을 링크로 씀)
-for pair in "internal-web|${INTERNAL_BASE_URL:-https://localhost:8080}" "external-web|${EXTERNAL_BASE_URL:-https://localhost:8090}"; do
-  IFS='|' read -r client base <<<"$pair"
+# 1-0) 앱 주소 맞추기: 로그인 후 돌아올 주소·로그아웃 후 주소·로그인 화면 로고 링크(baseUrl)
+#      realm 파일은 처음 한 번만 불러오므로, .env 의 주소(Funnel 배포 등)가 바뀌면 여기서 맞춘다. localhost 주소도 함께 허용
+for pair in "internal-web|${INTERNAL_BASE_URL:-https://localhost:8080}|https://localhost:8080" \
+            "external-web|${EXTERNAL_BASE_URL:-https://localhost:8090}|https://localhost:8090"; do
+  IFS='|' read -r client base local <<<"$pair"
   id=$($KC get clients -r "$REALM" -q clientId="$client" --fields id --format csv --noquotes)
-  [ -n "$id" ] && $KC update "clients/$id" -r "$REALM" -s "baseUrl=$base/"
+  [ -n "$id" ] || continue
+  $KC update "clients/$id" -r "$REALM" -s "baseUrl=$base/" \
+    -s "redirectUris=[\"$base/auth/callback\",\"$local/auth/callback\"]" \
+    -s "attributes.\"post.logout.redirect.uris\"=$base/##$local/"
+  echo "$client: $base (+ $local)"
 done
-echo "로그인 화면 로고 → 앱 첫 화면 (client baseUrl)"
 
 # 1-1) 토큰 암호화용 키(RSA-OAEP, use=enc)는 쓰지 않으므로 끈다.
 #      JWKS 에 enc 키가 섞여 있으면 일부 검증 코드(PyJWK.from_dict)가 키 목록 전체를 읽지 못해 모든 토큰을 거부한다.
