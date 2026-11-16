@@ -1,4 +1,5 @@
--- 회원 담당자 자동 배정: 새 회원이 등록되면 활성 상담 직원 중 한 명을 무작위로 담당자로 지정한다.
+-- 회원 담당자 자동 배정: 새 회원이 등록되면 활성 상담 직원 중 담당 회원이 가장 적은 사람(같으면 무작위)을 담당자로 지정한다.
+-- (07-member-signup.sql 이 같은 함수를 다시 정의한다)
 -- (시드 회원 20명은 03-seed.sql 에서 상담 직원당 10명씩 고정 배정)
 CREATE OR REPLACE FUNCTION assign_random_counselor() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -8,7 +9,8 @@ BEGIN
         SELECT u.user_id, NEW.member_id
           FROM users u
          WHERE u.role = 'counselor' AND u.active
-         ORDER BY random()
+         ORDER BY (SELECT count(*) FROM assignments a JOIN members m ON m.member_id = a.member_id
+                    WHERE a.user_id = u.user_id AND m.status = 'active'), random()
          LIMIT 1
         ON CONFLICT DO NOTHING
         RETURNING user_id

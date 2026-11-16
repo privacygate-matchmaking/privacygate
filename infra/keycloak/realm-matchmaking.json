@@ -45,7 +45,7 @@
   },
   "clients": [
     {
-      "clientId": "internal-web",
+      "clientId": "internal-web", "baseUrl": "${INTERNAL_BASE_URL}/",
       "name": "내부 업무 화면 (BFF: internal-api)",
       "enabled": true,
       "protocol": "openid-connect",
@@ -79,7 +79,7 @@
       ]
     },
     {
-      "clientId": "external-web",
+      "clientId": "external-web", "baseUrl": "${EXTERNAL_BASE_URL}/",
       "name": "외부 회원 화면 (BFF: external-api)",
       "enabled": true,
       "protocol": "openid-connect",
