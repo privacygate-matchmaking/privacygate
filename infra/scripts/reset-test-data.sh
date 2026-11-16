@@ -11,7 +11,7 @@
 #   파일     : 위 기록에 딸린 증빙 저장소 암호문·중계 대기/검사 파일
 #   Keycloak : 가입 폼 회원 계정, 직원 가입 신청(승인 포함) 계정
 # 유지하는 것
-#   시드 회원 20명·시드 직원 4명·member_b·member_001~020 계정, 시드 심사 기록, 소개 관계, 발급대장, 감사 로그(audit_log)
+#   mark-required-evidence.sh 로 넣은 필수 증빙 기록(key_id='test'), 시드 회원 20명·시드 직원 4명·member_b·member_001~020 계정, 시드 심사 기록, 소개 관계, 발급대장, 감사 로그(audit_log)
 #   시드 회원의 시험 중 바뀐 프로필 값(키·연락처 등)은 되돌리지 않는다. 학력·재직 확인 표시는 남은 심사 결과로 다시 맞춘다
 set -euo pipefail
 source "$(dirname "$0")/compare/_compose.sh"
@@ -25,7 +25,7 @@ check() {
   echo "== 업무 DB"
   bdb <<SQL
 SELECT '가입 폼 회원       ' || count(*) FROM members WHERE privacy_consent_version IS NOT NULL;
-SELECT '시험 증빙(시드 외) ' || count(*) FROM evidence_files WHERE key_id <> 'seed';
+SELECT '시험 증빙(시드 외) ' || count(*) FROM evidence_files WHERE key_id NOT IN ('seed', 'test');
 SELECT '시험 직원          ' || count(*) FROM users WHERE role <> 'member' AND pseudo_id NOT IN ($SEED_STAFF);
 SELECT '직원 가입 신청     ' || count(*) FROM staff_signups;
 SELECT '알림               ' || count(*) FROM notifications;
@@ -59,8 +59,8 @@ INSERT INTO kc SELECT user_id FROM members WHERE privacy_consent_version IS NOT 
 INSERT INTO k SELECT p.storage_key FROM members m, LATERAL purge_member(m.member_id, 0) p
  WHERE m.privacy_consent_version IS NOT NULL;
 DELETE FROM withdrawal_notices;
--- 2) 시험 중 시드 회원에 올린 증빙 (시드 심사 기록은 key_id = 'seed')
-CREATE TEMP TABLE tf ON COMMIT DROP AS SELECT file_id, storage_key FROM evidence_files WHERE key_id <> 'seed';
+-- 2) 시험 중 시드 회원에 올린 증빙 (시드 심사 기록 key_id='seed', 시연 준비 기록 key_id='test' 는 유지)
+CREATE TEMP TABLE tf ON COMMIT DROP AS SELECT file_id, storage_key FROM evidence_files WHERE key_id NOT IN ('seed', 'test');
 INSERT INTO k SELECT storage_key FROM tf WHERE storage_key IS NOT NULL;
 INSERT INTO k SELECT x FROM evidence_inspections i JOIN tf USING (file_id),
               LATERAL (VALUES (i.fields_key), (i.masked_key)) v(x) WHERE x IS NOT NULL;
