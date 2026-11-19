@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .audit import AuditWriter
@@ -58,7 +59,10 @@ def audit_request(audit: AuditWriter, request: Request, result: str, *, action: 
                  target_type=target_type, target_id=target_id, reason=reason)
 
 
-def install(app: FastAPI, audit: AuditWriter) -> None:
+def install(app: FastAPI, audit: AuditWriter,
+            on_deny: Callable[[Request, GateError], None] | None = None) -> None:
+    """on_deny: 거부 응답을 보내기 전에 부르는 사후 대응 훅 (예: 반복 거부 계정 임시 잠금, 보안 사건 기록).
+    훅이 실패해도 거부 결정과 응답은 바뀌지 않는다."""
     @app.middleware("http")
     async def _trace(request: Request, call_next):
         request.state.trace_id = uuid.uuid4().hex
@@ -73,6 +77,11 @@ def install(app: FastAPI, audit: AuditWriter) -> None:
     @app.exception_handler(GateError)
     async def _gate(request: Request, exc: GateError):
         audit_request(audit, request, "deny", reason=exc.reason)
+        if on_deny is not None:
+            try:
+                await run_in_threadpool(on_deny, request, exc)
+            except Exception:  # 대응 훅 장애가 차단 결정을 바꾸지 않게 한다
+                _log.exception("거부 후속 처리 실패")
         return JSONResponse(error_body(exc.code, trace_id(request), exc.message), status_code=exc.status)
 
     @app.exception_handler(StarletteHTTPException)

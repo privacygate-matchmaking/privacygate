@@ -24,6 +24,10 @@ echo "▶ 실제 파일 기록"
 db business-db matchmaking_business "COPY (SELECT e.export_id,u.pseudo_id AS created_by,u.role,e.row_count,e.file_hash,e.transfer_file_id,e.created_at FROM member_exports e JOIN users u ON u.user_id=e.created_by WHERE e.created_at >= '$SINCE' ORDER BY e.created_at) TO STDOUT WITH CSV HEADER" > "$OUT/member-exports.csv"
 db transfer-db matchmaking_transfer "COPY (SELECT file_id,file_hash,scan_status,scan_reason,export_banned,created_at FROM transfer_files ORDER BY created_at) TO STDOUT WITH CSV HEADER" > "$OUT/transfer-files.csv"
 db transfer-db matchmaking_transfer "COPY (SELECT d.delivery_id,d.downloaded_at,a.approved_file_id,r.request_status,r.purpose FROM deliveries d JOIN approvals a ON a.approval_id=d.approval_id JOIN export_requests r ON r.request_id=a.request_id ORDER BY d.created_at) TO STDOUT WITH CSV HEADER" > "$OUT/deliveries.csv"
+echo "▶ 사후 대응 기록 (보안 사건·자동 잠금·조치)"
+db business-db matchmaking_business "COPY (SELECT kind,severity,subject_code,subject_role,source,detail,trace_id,blocked,occurrences,auto_locked_until,status,first_seen_at,last_seen_at FROM security_incidents WHERE last_seen_at >= '$SINCE' ORDER BY first_seen_at) TO STDOUT WITH CSV HEADER" > "$OUT/security-incidents.csv" 2>/dev/null \
+  || echo "error,upgrade/014-security-response.sql 미적용" > "$OUT/security-incidents.csv"
+db business-db matchmaking_business "COPY (SELECT i.subject_code,a.action,a.result,u.pseudo_id AS actor,a.created_at FROM incident_actions a JOIN security_incidents i USING (incident_id) JOIN users u ON u.user_id=a.actor_id WHERE a.created_at >= '$SINCE' ORDER BY a.created_at) TO STDOUT WITH CSV HEADER" > "$OUT/incident-actions.csv" 2>/dev/null || true
 pg_compose exec -T transfer-api sh -c 'echo "[staging]"; ls -l /data/transfer-staging; echo "[verified]"; ls -l /data/transfer-verified' > "$OUT/transfer-storage.txt" 2>&1 || true
 echo "▶ Wazuh 경보"
 if docker ps --format '{{.Names}}' | grep -q '^ieum-wazuh-wazuh.manager-1$'; then

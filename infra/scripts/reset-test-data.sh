@@ -5,11 +5,13 @@
 #   ./infra/scripts/reset-test-data.sh apply    실제로 지우기 (되돌릴 수 없음, 먼저 check)
 #   ./infra/scripts/reset-test-data.sh check-keep / apply-keep
 #        계정은 모두 유지(가입 폼 회원·직원 포함, Keycloak 변경 없음)하고, 회원별·종류별 최신 승인 증빙도 유지.
-#        매칭·이용권·반출 기록, 승인 안 된(반려·대기·이전) 증빙, 알림·동의·내보내기 기록만 지운다.
+#        매칭·이용권·반출 기록, 승인 안 된(반려·대기·이전) 증빙, 알림·동의·내보내기 기록, 보안 사건·잠금만 지운다
+#        (보안 대응으로 정지했던 계정은 다시 켠다).
 #
 # 지우는 것
 #   업무 DB  : 가입 폼으로 만든 회원(계정·증빙·동의 포함), 시험 중 시드 회원에 올린 증빙, 직원 가입 신청·승인 직원,
-#              알림, 탈퇴 안내 기록, 소개 자료 기록(intro_files), 동의, 시드 외 매칭 기록, 관리자 내보내기 기록
+#              알림, 탈퇴 안내 기록, 소개 자료 기록(intro_files), 동의, 시드 외 매칭 기록, 관리자 내보내기 기록,
+#              보안 사건·조치 기록·자동 잠금 (정지했던 계정은 업무 DB·Keycloak 모두 다시 활성)
 #   중계 DB  : 유료 매칭(주문·이용권·신청·공개 동의·만남 일정), 반출 신청·승인·전달·중계 파일
 #   파일     : 위 기록에 딸린 증빙 저장소 암호문·중계 대기/검사 파일
 #   Keycloak : 가입 폼 회원 계정, 직원 가입 신청(승인 포함) 계정
@@ -37,6 +39,7 @@ SELECT '소개 자료 기록     ' || count(*) FROM intro_files;
 SELECT '관리자 내보내기    ' || count(*) FROM member_exports;
 SELECT '탈퇴 대기 시드 회원 ' || count(*) FROM members WHERE status <> 'active' AND privacy_consent_version IS NULL;
 SELECT '탈퇴 안내 기록     ' || count(*) FROM withdrawal_notices;
+$(security_count_sql)
 SQL
   echo "== 중계 DB"
   tdb <<'SQL'
@@ -50,7 +53,30 @@ SELECT '중계 파일          ' || count(*) FROM transfer_files;
 SQL
 }
 
-# 업무 DB 정리 SQL. 결과 줄: K|<저장소 키>  /  U|<Keycloak 사용자 id>
+# 보안 사건 대응 기록 정리 (두 모드 공통): 정지했던 계정은 다시 활성으로 (Keycloak 은 E| 줄로 다시 켠다),
+# 임시 잠금·거부 신호·보안 사건·조치 기록 삭제. upgrade/014 를 적용하지 않은 DB 에서는 계정만 되돌린다
+security_sql() {
+  cat <<'SQL'
+CREATE TEMP TABLE se ON COMMIT DROP AS SELECT user_id FROM users WHERE NOT active AND role <> 'data_admin';
+UPDATE users u SET active = true FROM se WHERE u.user_id = se.user_id;
+DO $$ BEGIN
+  IF to_regclass('public.security_incidents') IS NOT NULL THEN
+    DELETE FROM account_locks; DELETE FROM security_signals; DELETE FROM incident_actions; DELETE FROM security_incidents;
+  END IF;
+END $$;
+SELECT 'E|' || user_id FROM se;
+SQL
+}
+
+security_count_sql() {
+  cat <<'SQL'
+SELECT '정지된 계정         ' || count(*) FROM users WHERE NOT active AND role <> 'data_admin';
+SELECT '보안 사건           ' || CASE WHEN to_regclass('public.security_incidents') IS NULL THEN 'upgrade/014 미적용'
+                                   ELSE (SELECT count(*) FROM security_incidents)::text END;
+SQL
+}
+
+# 업무 DB 정리 SQL. 결과 줄: K|<저장소 키>  /  U|<Keycloak 사용자 id>  /  E|<다시 켤 Keycloak 사용자 id>
 # (macOS 기본 bash 3.2 는 $( ) 안의 heredoc 에 괄호가 있으면 해석하지 못해 함수로 분리)
 business_cleanup() {
   bdb <<SQL
@@ -85,7 +111,9 @@ DELETE FROM member_exports;
 -- 4) 시험 중 탈퇴 요청된 시드 회원은 활동 상태로
 UPDATE members SET status = 'active', withdraw_requested_at = NULL, withdraw_at = NULL,
                    withdraw_requested_by = NULL, withdraw_reason = NULL WHERE status <> 'active';
--- 5) 직원 가입 신청·승인 직원: 담당 회원은 시드 상담 직원 중 담당이 적은 쪽으로 넘기고 삭제
+-- 5) 보안 사건 대응 기록 (정지 계정 복구) — 시험 직원 삭제보다 먼저
+$(security_sql)
+-- 6) 직원 가입 신청·승인 직원: 담당 회원은 시드 상담 직원 중 담당이 적은 쪽으로 넘기고 삭제
 INSERT INTO kc SELECT user_id FROM staff_signups;
 DELETE FROM staff_signups;
 CREATE TEMP TABLE ts ON COMMIT DROP AS
@@ -101,7 +129,7 @@ DELETE FROM assignments a USING ts WHERE a.user_id = ts.user_id;
 UPDATE evidence_files e SET reviewer_user_id = NULL FROM ts WHERE e.reviewer_user_id = ts.user_id;
 DELETE FROM sessions s USING ts WHERE s.user_id = ts.user_id;
 DELETE FROM users u USING ts WHERE u.user_id = ts.user_id;
--- 6) 알림 (모두 시험 중 생긴 것)
+-- 7) 알림 (모두 시험 중 생긴 것)
 DELETE FROM notifications;
 SELECT 'K|' || key FROM k WHERE key IS NOT NULL AND key <> '';
 SELECT 'U|' || user_id FROM kc;
@@ -149,6 +177,7 @@ DELETE FROM member_exports;
 DELETE FROM withdrawal_notices;
 UPDATE members SET status = 'active', withdraw_requested_at = NULL, withdraw_at = NULL,
                    withdraw_requested_by = NULL, withdraw_reason = NULL WHERE status <> 'active';
+$(security_sql)
 DELETE FROM notifications;
 SELECT 'K|' || key FROM k WHERE key IS NOT NULL AND key <> '';
 COMMIT;
@@ -167,6 +196,7 @@ SELECT '동의                ' || count(*) FROM consents;
 SELECT '관리자 내보내기      ' || count(*) FROM member_exports;
 SELECT '탈퇴 대기 회원       ' || count(*) FROM members WHERE status <> 'active';
 SELECT '회원 계정(유지)      ' || count(*) FROM members WHERE user_id IS NOT NULL;
+$(security_count_sql)
 ROLLBACK;
 SQL
   echo "== 중계 DB (모두 삭제: 매칭·이용권·반출)"
@@ -181,11 +211,12 @@ SQL
 }
 
 apply() {
-  local keys users out
+  local keys users out enable
   echo "== 업무 DB 정리"
   if [ "${KEEP:-0}" = 1 ]; then out=$(business_cleanup_keep); else out=$(business_cleanup); fi
   keys=$(printf '%s\n' "$out" | sed -n 's/^K|//p' | sort -u)
   users=$(printf '%s\n' "$out" | sed -n 's/^U|//p' | sort -u)
+  enable=$(printf '%s\n' "$out" | sed -n 's/^E|//p' | sort -u)
   echo "  증빙 저장소 파일 $(printf '%s' "$keys" | grep -c . || true)개, Keycloak 계정 $(printf '%s' "$users" | grep -c . || true)개 정리 대상"
 
   echo "== 중계 DB 정리"
@@ -235,6 +266,18 @@ while read -r id; do
   $KC delete "users/$id" -r matchmaking >/dev/null 2>&1 && n=$((n+1))
 done
 echo "  Keycloak 계정 ${n}개 삭제"'
+  fi
+  if [ -n "$enable" ]; then
+    echo "== 보안 대응으로 정지했던 계정 다시 켜기 (Keycloak)"
+    printf '%s\n' "$enable" | pg_compose exec -T keycloak bash -c '
+KC=/opt/keycloak/bin/kcadm.sh
+$KC config credentials --server http://localhost:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1 || { echo "  Keycloak 관리자 로그인 실패"; exit 1; }
+n=0
+while read -r id; do
+  [ -n "$id" ] || continue
+  $KC update "users/$id" -r matchmaking -s enabled=true >/dev/null 2>&1 && n=$((n+1))
+done
+echo "  Keycloak 계정 ${n}개 활성화"'
   fi
   echo "완료. 남은 개수:"
   if [ "${KEEP:-0}" = 1 ]; then check_keep; else check; fi

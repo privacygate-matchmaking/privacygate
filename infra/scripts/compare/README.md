@@ -6,8 +6,8 @@ baseline은 공격 ①②가 노리는 통제 2개만 끈다. 로그인·세션�
 
 | 시나리오 | 공격 | baseline 기대 | enforce 기대 | Wazuh |
 |---|---|---|---|---|
-| ① | 상담 직원이 총관리자 전용 "전체 회원 내보내기" 호출 → 파일을 중계에 등록 | 201, 내보내기 파일 생성, 중계 등록(검사 차단 상태) | 403 ×3, 파일 없음 | 100132(허용·우회 기록) / 100110 ×2 → 100112(반복 거부) |
-| ② | 승인 자료를 받은 회원이 다운로드 요청의 `file_id`만 ①의 파일로 바꿔치기 | 200, 전체 회원 CSV 반환 | 403 `requested_file_not_approved` | 100131(연결 검사 생략) / 100111(승인 파일 불일치) |
+| ① | 상담 직원이 총관리자 전용 "전체 회원 내보내기" 호출 → 파일을 중계에 등록 | 201, 내보내기 파일 생성, 중계 등록(검사 차단 상태), 보안 사건 '차단 안 됨' | 403 ×3, 파일 없음, 보안 사건(3회) + **15분 자동 임시 잠금** | 100132(허용·우회 기록) / 100110 ×2 → 100112(반복 거부) + 100150(자동 잠금) |
+| ② | 승인 자료를 받은 회원이 다운로드 요청의 `file_id`만 ①의 파일로 바꿔치기 | 200, 전체 회원 CSV 반환, 보안 사건 '차단 안 됨' | 403 `requested_file_not_approved`, 보안 사건(중계 → 내부 알림) | 100131(연결 검사 생략) / 100111(승인 파일 불일치) |
 
 ## 파일
 
@@ -16,7 +16,8 @@ baseline은 공격 ①②가 노리는 통제 2개만 끈다. 로그인·세션�
 | `run-mode.sh baseline\|enforce` | internal-api·transfer-api·external-api만 해당 모드로 다시 띄움 (.env 수정 없음) |
 | `attack-console.js` | 브라우저 Console에 붙여 넣는 공격 ①② 요청 코드. 두 모드에서 그대로 사용 |
 | `collect-evidence.sh <모드> <since>` | 응답 기록·감사 로그(DB+JSON)·파일 기록·저장소 목록·Wazuh 경보를 `evidence/<시각>-<모드>/`에 모음 |
-| `make-report.py <baseline 폴더> <enforce 폴더>` | 비교표 `evidence/report.md` 생성 |
+| `make-report.py <baseline 폴더> <enforce 폴더>` | 비교표 `evidence/report.md` 생성 (보안 사건·지연 측정 포함) |
+| `latency-console.js` | (선택) 정상 요청 응답 시간 p50·p95 측정 코드. 직원 탭·회원 탭에서 두 모드 모두 실행 → `pg-evidence-latency-*` |
 
 `evidence/`는 Git 제외다. 합성 데이터라도 외부에 올리지 않는다.
 
@@ -85,13 +86,16 @@ privacygate 폴더에서 실행한다.
 ./infra/scripts/compare/run-mode.sh enforce
 ```
 
-1. counselor_a 탭에서 새로고침하고 **공격 ①**을 그대로 실행한다(3회 거부).
+1. counselor_a 탭에서 새로고침하고 **공격 ①**을 그대로 실행한다(3회 거부 → counselor_a 15분 자동 임시 잠금. 탭을 새로고침하면 로그인 화면에 잠금 안내가 보인다).
 2. member_001 탭에서 새로고침하고 **공격 ②**를 baseline 때와 **같은 FILE_ID**로 실행한다.
-3. 증거를 모은다.
+3. (사후 대응 장면) data_admin 탭 → **보안 사건** 메뉴에서 ①·② 사건을 연다. 공격 ① 사건에서 "계정 정지"를 누르면 counselor_a 세션이 끊기고, 공격 ② 사건에서 "받은 자료 회수"를 누르면 member_001 의 승인 자료가 회수된다. 시연 뒤 "계정 복구"로 되돌린다.
+4. 증거를 모은다.
 
 ```bash
 ./infra/scripts/compare/collect-evidence.sh enforce <since 시각>
 ```
+
+(선택) 지연 측정: 각 모드에서 counselor_b 탭(잠기지 않은 직원)과 member_001 탭 Console 에 `latency-console.js` 를 붙여 실행하면 `pg-evidence-latency-*.json` 이 내려받아지고, 같은 모드의 collect-evidence 가 함께 옮긴다. 공격 요청은 보내지 않는다.
 
 ## 4. 보고서
 
@@ -107,3 +111,4 @@ python3 infra/scripts/compare/make-report.py evidence/<시각>-baseline evidence
 
 - 모드가 enforce인지 다시 확인한다. `run-mode.sh enforce`의 출력에 세 서비스 모두 `GATE_MODE=enforce`로 나와야 한다.
 - baseline 시연으로 생긴 내보내기 파일과 중계 파일은 시험 기록이다. 필요하면 시연 기록 정리 명령으로 지운다.
+- 잠긴 계정은 15분 뒤 저절로 풀린다. 바로 풀려면 data_admin → 보안 사건 → "임시 잠금 해제". 시연 기록 정리(`reset-test-data.sh apply-keep`)는 보안 사건·잠금을 지우고 정지했던 계정을 다시 켠다.
