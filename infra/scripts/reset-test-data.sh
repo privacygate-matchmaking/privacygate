@@ -230,6 +230,7 @@ DELETE FROM matching_requests;
 DELETE FROM matching_memberships;
 DELETE FROM matching_orders;
 DELETE FROM matching_profiles;
+DO $$ BEGIN IF to_regclass('public.download_tokens') IS NOT NULL THEN DELETE FROM download_tokens; END IF; END $$;
 DELETE FROM deliveries;
 DELETE FROM approvals;
 DELETE FROM export_requests;

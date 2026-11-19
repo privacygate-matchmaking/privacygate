@@ -3,8 +3,9 @@
  * (거부 요청을 반복하면 자동 임시 잠금이 걸린다).
  *   - 직원 화면 탭(로그인한 상담 직원·총관리자): GET /api/me, GET /api/members
  *       → 세션·역할·임시 잠금 확인 + 업무 DB 조회
- *   - 회원 화면 탭(승인 자료를 받은 회원): GET /api/me/status, GET /api/me/deliveries/{id}/download (대조군 정상 다운로드)
- *       → 외부 → 중계 → 내부 회원 상태 확인 + 승인·동의·무결성·파일 연결 검사
+ *   - 회원 화면 탭(승인 자료를 받은 회원): GET /api/me/status, GET /api/me/deliveries
+ *       → 외부 → 중계 → 내부 회원 상태 확인 + 제공 건별 승인·동의 상태 확인
+ *       (다운로드는 일회용 토큰·횟수 제한(기본 5회)이 있어 반복 측정 대상에서 뺀다)
  * 결과: pg-evidence-latency-<직원|회원>-<모드>.json 으로 내려받아지고, collect-evidence.sh 가 증거 폴더로 옮긴다.
  * 토큰·쿠키·응답 본문은 기록하지 않는다 (상태 코드와 시간만). */
 (async (N = 30) => {
@@ -15,11 +16,7 @@
   if (staff) {
     targets.push(['GET /api/me', '/api/me'], ['GET /api/members', '/api/members']);
   } else {
-    targets.push(['GET /api/me/status', '/api/me/status']);
-    const list = await (await fetch('/api/me/deliveries', {credentials: 'same-origin'})).json();
-    const d = (list.items || []).find(x => x.request_status === 'approved');
-    if (d) targets.push(['GET /api/me/deliveries/{id}/download', `/api/me/deliveries/${d.delivery_id}/download`]);
-    else console.warn('승인된 자료가 없어 다운로드 측정은 건너뜁니다.');
+    targets.push(['GET /api/me/status', '/api/me/status'], ['GET /api/me/deliveries', '/api/me/deliveries']);
   }
   const out = {scenario: 'latency', side: staff ? 'staff' : 'member', gate_mode: me.gate_mode || '(회원 화면은 모드 표시 없음)',
                n: N, started_at: new Date().toISOString(), user_agent: navigator.userAgent, results: []};

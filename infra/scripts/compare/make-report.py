@@ -66,6 +66,9 @@ def summarize(folder):
         'trace_ids': [x['trace_id'] for x in att1] + [x for x in [((a2 or {}).get('attack') or {}).get('trace_id')] if x],
     }
     incidents = [r for r in rows(d / 'security-incidents.csv') if r.get('kind')]
+    chain = d / 'audit-chain.txt'
+    text = chain.read_text(encoding='utf-8', errors='replace') if chain.exists() else ''
+    s['chain'] = ('손상 발견' if '[손상]' in text else '정상 (해시 체인 일치)' if '[정상]' in text else '검사 기록 없음')
     s['incidents'] = [(r['kind'], r['subject_code'], '차단' if r['blocked'] in ('t', 'true', 'True') else '통과',
                        int(r['occurrences'] or 0), bool(r['auto_locked_until'])) for r in incidents]
     s['latency'] = [x for p in sorted(d.glob('pg-evidence-latency-*.json')) for x in [load_json(p)] if x]
@@ -124,6 +127,7 @@ def main(base, enf):
         f"| Wazuh 일반 업무 기록 | {b['other_alerts']}건 | {e['other_alerts']}건 |",
         f"| 판정 | ①{'유출' if b['a1_leak'] else '차단'} · ②{'유출' if b['a2_leak'] else '차단'} | ①{'유출' if e['a1_leak'] else '차단'} · ②{'유출' if e['a2_leak'] else '차단'} |",
         f"| 사후 대응: 보안 사건 | {fmt_incidents(b['incidents'])} | {fmt_incidents(e['incidents'])} |",
+        f"| 감사 로그 무결성 | {b['chain']} | {e['chain']} |",
         '', '## 통제 지연 (정상 요청 응답 시간, latency-console.js)', '',
         *latency_table(b['latency'], e['latency']),
         '', '## 판정 기준', '',

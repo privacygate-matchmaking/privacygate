@@ -4,6 +4,7 @@
 #  1) 한국어 기본, 직원용 로그인 테마(internal-web 만), 토큰 암호화 키 끄기
 #  2) OTP 는 쓰지 않는다: 이전 설정으로 남은 직원의 OTP 등록 요구·등록된 OTP 를 지운다 (ID·비밀번호 로그인)
 #  3) internal-admin client: internal-api 가 회원가입·직원 가입 신청 계정 생성·승인, 탈퇴 확정 회원의 Keycloak 세션 종료·계정 삭제에만 쓰는 service account
+#  3-1) 로그인·관리 이벤트 저장, 무차별 대입 잠금, internal-admin 에 이벤트 읽기 권한
 #  4) 역할 그룹 members·counselors·approvers: 가입 폼·직원 가입 승인으로 만든 계정은 그룹으로만 역할을 받는다
 set -euo pipefail
 KC=/opt/keycloak/bin/kcadm.sh
@@ -86,6 +87,15 @@ $KC update "clients/$aid" -r "$REALM" -s "secret=${INTERNAL_ADMIN_CLIENT_SECRET:
 $KC add-roles -r "$REALM" --uusername service-account-internal-admin --cclientid realm-management \
   --rolename view-users --rolename manage-users
 echo "internal-admin client: 회원·직원 가입 계정 생성·승인, 탈퇴 회원 계정 정리용 (view-users, manage-users)"
+
+# 3-1) 로그인·관리 이벤트 저장 (30일). internal-api 가 view-events 로 읽어 감사 로그(→ Wazuh 100180~100183)로 옮긴다.
+#      관리 이벤트 상세(representation)는 저장하지 않는다 (비밀번호 등 값이 들어갈 수 있음). 무차별 대입 잠금은 realm 파일에 이미 켜 둠
+$KC update "realms/$REALM" -s eventsEnabled=true -s eventsExpiration=2592000 \
+  -s 'enabledEventTypes=["LOGIN","LOGIN_ERROR","LOGOUT","CODE_TO_TOKEN_ERROR","REFRESH_TOKEN_ERROR","UPDATE_PASSWORD","UPDATE_PASSWORD_ERROR"]' \
+  -s adminEventsEnabled=true -s adminEventsDetailsEnabled=false \
+  -s bruteForceProtected=true -s failureFactor=5 -s waitIncrementSeconds=60 -s maxFailureWaitSeconds=900
+$KC add-roles -r "$REALM" --uusername service-account-internal-admin --cclientid realm-management --rolename view-events
+echo "로그인·관리 이벤트 저장(30일), 5회 실패 시 잠금, internal-admin 에 view-events"
 
 # 4) 역할 그룹: 가입 폼으로 만든 계정은 그룹으로만 업무 역할을 받는다 (internal-admin 에 역할 부여 권한 불필요)
 #    members=회원가입(즉시), counselors·approvers=직원 가입 신청을 총관리자가 승인할 때

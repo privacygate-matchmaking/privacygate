@@ -29,6 +29,9 @@ db business-db matchmaking_business "COPY (SELECT kind,severity,subject_code,sub
   || echo "error,upgrade/014-security-response.sql 미적용" > "$OUT/security-incidents.csv"
 db business-db matchmaking_business "COPY (SELECT i.subject_code,a.action,a.result,u.pseudo_id AS actor,a.created_at FROM incident_actions a JOIN security_incidents i USING (incident_id) JOIN users u ON u.user_id=a.actor_id WHERE a.created_at >= '$SINCE' ORDER BY a.created_at) TO STDOUT WITH CSV HEADER" > "$OUT/incident-actions.csv" 2>/dev/null || true
 pg_compose exec -T transfer-api sh -c 'echo "[staging]"; ls -l /data/transfer-staging; echo "[verified]"; ls -l /data/transfer-verified' > "$OUT/transfer-storage.txt" 2>&1 || true
+echo "▶ 감사 로그 위변조 검사 (해시 체인)"
+pg_compose exec -T -u 0 internal-api python - < "$HERE/../audit-verify.py" > "$OUT/audit-chain.txt" 2>&1 \
+  || echo "(검사에서 문제 발견 또는 실행 실패 — audit-chain.txt 확인)"
 echo "▶ Wazuh 경보"
 if docker ps --format '{{.Names}}' | grep -q '^ieum-wazuh-wazuh.manager-1$'; then
   sleep 5   # 수집 지연 여유

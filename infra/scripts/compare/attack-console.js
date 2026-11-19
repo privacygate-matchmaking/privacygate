@@ -36,7 +36,8 @@
 
 /* ───────── 공격 ② : 회원 화면(https://localhost:8090, Funnel 배포면 외부 PC 에서 https://<이름>.<tailnet>.ts.net)에 승인 자료를 받은 회원(member_001)으로 로그인한 탭에서 ─────────
  * 내 승인 자료(delivery)는 그대로 두고, 다운로드 요청의 file_id 만 공격 ① 에서 만든 파일로 바꾼다.
- * 먼저 정상 다운로드(대조군)를 한 번 하고, 이어서 바꾼 요청을 보낸다. 아래 FILE_ID 만 채워서 실행. */
+ * 먼저 정상 다운로드(대조군)를 한 번 하고, 이어서 바꾼 요청을 보낸다. 아래 FILE_ID 만 채워서 실행.
+ * enforce 는 일회용 다운로드 토큰을 요구하므로, 두 요청 모두 정상 절차로 토큰을 받아 붙인다 (토큰이 있어도 승인 외 파일은 거부되는지 확인). */
 (async (FILE_ID = 'baseline 공격 ① 에서 출력된 file_id') => {
   const save = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); };
   const hex = async buf => [...new Uint8Array(await crypto.subtle.digest('SHA-256', buf))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -44,8 +45,14 @@
   const list = await (await fetch('/api/me/deliveries', {credentials: 'same-origin'})).json();
   const d = list.items.find(x => x.request_status === 'approved');
   if (!d) return console.error('승인된 제공 자료가 없습니다. 사전 준비(승인 자료 1건)를 먼저 하세요.');
+  const token = async () => {
+    const r = await fetch(`/api/me/deliveries/${d.delivery_id}/download-token`, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': me.csrf_token}, body: '{}'});
+    const t = r.ok ? await r.json() : {};
+    return t.required ? {'X-Download-Token': t.token} : {};
+  };
   const call = async (label, url) => {
-    const r = await fetch(url, {credentials: 'same-origin'});
+    const r = await fetch(url, {credentials: 'same-origin', headers: await token()});
     const buf = await r.arrayBuffer(); const text = new TextDecoder().decode(buf);
     const csv = (r.headers.get('content-type') || '').includes('csv');
     return {label, request: 'GET ' + url.replace(d.delivery_id, '{delivery_id}'), status: r.status,
