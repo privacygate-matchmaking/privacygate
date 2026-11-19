@@ -77,9 +77,21 @@ services:
       - ../matchmaking-internal/internal-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ../matchmaking-internal/internal-web/public:/usr/share/nginx/html:ro
       - ./infra/secrets/tls:/etc/nginx/tls:ro
+      - web-logs:/var/log/nginx-ieum          # 접속 기록 JSON → Wazuh (읽기 전용으로 수집)
     ports: ["127.0.0.1:8080:8443"]          # HTTPS
     networks: [public-internal, internal-web-net]
-    depends_on: [internal-api]
+    depends_on:
+      internal-api: { condition: service_started }
+      web-logs-init: { condition: service_completed_successfully }
+
+  # 접속 기록 볼륨을 nginx 계정(101)이 쓸 수 있게 한 번만 소유자 지정 (이미 받은 postgres 이미지 재사용, 네트워크 없음)
+  web-logs-init:
+    image: postgres:16-alpine
+    user: root
+    entrypoint: ["sh", "-c", "chown 101:101 /logs && chmod 755 /logs"]
+    volumes: [web-logs:/logs]
+    network_mode: none
+    restart: "no"
 
   internal-api:
     build:
@@ -194,9 +206,12 @@ services:
       - ../matchmaking-external/external-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ../matchmaking-external/external-web/public:/usr/share/nginx/html:ro
       - ./infra/secrets/tls:/etc/nginx/tls:ro
+      - web-logs:/var/log/nginx-ieum
     ports: ["127.0.0.1:8090:8443"]          # HTTPS
     networks: [public-external, external-net]
-    depends_on: [external-api]
+    depends_on:
+      external-api: { condition: service_started }
+      web-logs-init: { condition: service_completed_successfully }
 
   external-api:
     profiles: [external]          # matchmaking-external 레포가 있을 때만 (--profile external)
@@ -243,6 +258,7 @@ volumes:
   transfer-staging:      # 검사 전 반출 파일 (transfer-api 만)
   transfer-verified:     # 검사 통과 파일 (transfer-api 만)
   audit-logs:            # JSON 감사 로그 → 4주차 Wazuh 수집
+  web-logs:              # nginx 접속 기록 JSON (internal-web·external-web) → Wazuh
 
 secrets:
   evidence_master_key:

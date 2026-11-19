@@ -1,0 +1,55 @@
+# 서비스 간 mTLS 켜기 (선택 overlay). 먼저 ./infra/scripts/mtls-certs.sh 로 인증서를 만든다.
+#   composeArgs 에 -f ../privacygate/compose.mtls.yaml 을 compose.yaml 다음(외부 overlay 뒤)에 추가 → up -d
+# - internal-api·transfer-api: HTTPS + 클라이언트 인증서 필수 (사설 CA 서명만 허용, --ssl-cert-reqs 2)
+# - 호출하는 쪽: internal-web(nginx→internal-api), internal-api→transfer-api, transfer-api→internal-api, external-api→transfer-api
+# - 서비스 토큰·사용자 토큰 검사는 그대로 (mTLS 는 연결 단계의 상호 인증을 더하는 것)
+# 끄려면 이 파일을 composeArgs 에서 빼고 up -d (인증서 파일은 그대로 둬도 된다).
+x-mtls-client: &mtls_client
+  MTLS_CA_FILE: /run/secrets/mtls_ca
+
+services:
+  internal-web:
+    volumes:
+      - ../matchmaking-internal/internal-web/nginx.mtls.conf:/etc/nginx/conf.d/default.conf:ro
+    secrets: [mtls_ca, mtls_internal_web_cert, mtls_internal_web_key]
+
+  internal-api:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
+              "--ssl-certfile", "/run/secrets/mtls_internal_api_cert", "--ssl-keyfile", "/run/secrets/mtls_internal_api_key",
+              "--ssl-ca-certs", "/run/secrets/mtls_ca", "--ssl-cert-reqs", "2"]
+    environment:
+      <<: *mtls_client
+      MTLS_CERT_FILE: /run/secrets/mtls_internal_api_cert
+      MTLS_KEY_FILE: /run/secrets/mtls_internal_api_key
+      TRANSFER_API_URL: https://transfer-api:8000
+    secrets: [mtls_ca, mtls_internal_api_cert, mtls_internal_api_key]
+
+  transfer-api:
+    command: ["uvicorn", "ieum.transfer:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--no-access-log",
+              "--ssl-certfile", "/run/secrets/mtls_transfer_api_cert", "--ssl-keyfile", "/run/secrets/mtls_transfer_api_key",
+              "--ssl-ca-certs", "/run/secrets/mtls_ca", "--ssl-cert-reqs", "2"]
+    environment:
+      <<: *mtls_client
+      MTLS_CERT_FILE: /run/secrets/mtls_transfer_api_cert
+      MTLS_KEY_FILE: /run/secrets/mtls_transfer_api_key
+      INTERNAL_API_URL: https://internal-api:8000
+    secrets: [mtls_ca, mtls_transfer_api_cert, mtls_transfer_api_key]
+
+  external-api:
+    environment:
+      <<: *mtls_client
+      MTLS_CERT_FILE: /run/secrets/mtls_external_api_cert
+      MTLS_KEY_FILE: /run/secrets/mtls_external_api_key
+      TRANSFER_API_URL: https://transfer-api:8000
+    secrets: [mtls_ca, mtls_external_api_cert, mtls_external_api_key]
+
+secrets:
+  mtls_ca:                 { file: ./infra/secrets/mtls/ca.pem }
+  mtls_internal_api_cert:  { file: ./infra/secrets/mtls/internal-api.pem }
+  mtls_internal_api_key:   { file: ./infra/secrets/mtls/internal-api.key }
+  mtls_transfer_api_cert:  { file: ./infra/secrets/mtls/transfer-api.pem }
+  mtls_transfer_api_key:   { file: ./infra/secrets/mtls/transfer-api.key }
+  mtls_external_api_cert:  { file: ./infra/secrets/mtls/external-api.pem }
+  mtls_external_api_key:   { file: ./infra/secrets/mtls/external-api.key }
+  mtls_internal_web_cert:  { file: ./infra/secrets/mtls/internal-web.pem }
+  mtls_internal_web_key:   { file: ./infra/secrets/mtls/internal-web.key }

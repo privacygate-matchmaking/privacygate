@@ -86,6 +86,19 @@ python -m unittest discover -s tests -v   # 실행 환경 시험은 PyYAML 필�
 - 이 레포를 고치면 내부·외부 담당 모두 PR 리뷰한다.
 - `.env`, `infra/secrets/` 는 절대 커밋하지 않는다. 커밋 전 `git status` 확인.
 
+## 서비스 간 mTLS (선택)
+internal-api·transfer-api 가 사설 CA 가 서명한 클라이언트 인증서가 있는 연결만 받는다. 서비스 토큰 검사는 그대로 유지한다.
+```bash
+./infra/scripts/mtls-certs.sh          # 인증서 생성 (infra/secrets/mtls, Git 제외). 교체: mtls-certs.sh rotate
+./infra/scripts/mtls-certs.sh enable   # 보조 스크립트가 compose.mtls.yaml 을 함께 쓰도록 표시
+# composeArgs 끝(외부 overlay 뒤)에 -f ../privacygate/compose.mtls.yaml 추가 → up -d
+./infra/scripts/mtls-check.sh          # 각 경로: 내 인증서 → 연결, 인증서 없음·평문 HTTP → 차단
+```
+끄기: composeArgs 에서 빼고 `mtls-certs.sh disable` → `up -d`.
+
+## 감사 로그 무결성
+`./infra/scripts/audit-verify.sh` — 서비스별 감사 파일의 해시 체인을 검사 (수정·삭제·순서 변경·누락 → Wazuh 100160).
+
 ## 최종 보안 비교 시연
 
 `infra/scripts/compare/` — baseline·enforce 에 같은 요청(공격 ①②)을 보내고 응답·실제 파일·감사 로그·Wazuh 경보를 `evidence/` 에 모아 비교 보고서를 만든다. 절차는 [compare/README.md](infra/scripts/compare/README.md).
